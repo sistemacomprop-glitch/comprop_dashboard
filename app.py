@@ -1,4 +1,4 @@
-# app.py - Versão Completa para Deploy (Apenas Dashboard Online)
+# app.py - Versão 6.0: Correção de perda de dados e adição de contadores (Completo)
 
 import streamlit as st
 import pandas as pd
@@ -29,12 +29,11 @@ carregar_css()
 # =================================================================================
 # --- CONEXÃO SEGURA E CARREGAMENTO DE DADOS DO GOOGLE SHEETS ---
 # =================================================================================
-# Função para conectar ao Google Sheets usando os "Secrets" do Streamlit
 def conectar_google_sheets():
     try:
         creds_dict = st.secrets["gcp_service_account"]
         gc = gspread.service_account_from_dict(creds_dict)
-        spreadsheet = gc.open("COMPROP_Dashboard_Data") # Nome da sua planilha no Drive
+        spreadsheet = gc.open("COMPROP_Dashboard_Data")
         worksheet = spreadsheet.sheet1
         return worksheet
     except Exception as e:
@@ -42,8 +41,7 @@ def conectar_google_sheets():
         st.exception(e)
         return None
 
-# Função para carregar os dados (com cache para performance)
-@st.cache_data(ttl=600) # O cache expira a cada 10 minutos
+@st.cache_data(ttl=600)
 def carregar_dados_online():
     worksheet = conectar_google_sheets()
     if worksheet:
@@ -55,6 +53,7 @@ def carregar_dados_online():
             if col not in df.columns:
                 df[col] = pd.NA
         
+        # A linha que removia dados com data vazia foi permanentemente retirada.
         df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], errors='coerce')
         for col in ['Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário']:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -74,8 +73,11 @@ st.sidebar.header("Filtros de Análise")
 if not df.empty:
     df_filtrado = df.copy()
 
-    data_min = df_filtrado['Data Emissão'].min().date()
-    data_max = df_filtrado['Data Emissão'].max().date()
+    # Filtro de Data (ignora datas vazias/NaT para definir o range)
+    datas_validas = df_filtrado['Data Emissão'].dropna()
+    data_min = datas_validas.min().date()
+    data_max = datas_validas.max().date()
+    
     data_inicial = st.sidebar.date_input("Data Inicial", data_min, min_value=data_min, max_value=data_max)
     data_final = st.sidebar.date_input("Data Final", data_max, min_value=data_inicial, max_value=data_max)
 
@@ -92,6 +94,7 @@ if not df.empty:
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, key='clientes_selecionados')
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
 
+    # Aplica os filtros
     df_filtrado = df_filtrado[
         (df_filtrado['Data Emissão'].dt.date >= data_inicial) &
         (df_filtrado['Data Emissão'].dt.date <= data_final) &
@@ -122,7 +125,11 @@ else:
 # =================================================================================
 st.title("Dashboard de Análise de Vendas")
 
-if not df_filtrado.empty:
+if not df.empty:
+    # Contador de Registros para transparência
+    st.info(f"Exibindo **{len(df_filtrado):,}** de **{len(df):,}** registros totais.")
+    st.divider()
+
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Dashboard Geral", "📈 Entradas vs. Saídas", "🏆 Ranking de Produtos", 
         "👑 Ranking Vendedores", "📋 Consulta Detalhada"
@@ -138,7 +145,7 @@ if not df_filtrado.empty:
             df_vendas = df_filtrado[df_filtrado['Movimentação'] == 'Saída']
             st.subheader("Resumo de Vendas")
             total_vendas = df_vendas['Total do Item'].sum()
-            total_custo_vendas = (df_vendas['Preço de Custo'] * df_vendas['Quantidade']).sum()
+            total_custo_vendas = (df_vendas['Custo Total']).sum()
             lucro_bruto = total_vendas - total_custo_vendas
             
             col1, col2, col3 = st.columns(3)
@@ -203,8 +210,9 @@ if not df_filtrado.empty:
                 "Total do Item": st.column_config.NumberColumn(format="R$ %.2f"),
                 "Preço de Venda": st.column_config.NumberColumn(format="R$ %.2f"),
                 "Preço de Custo": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo Total": st.column_config.NumberColumn(format="R$ %.2f"),
             }
         )
 else:
-    st.info("Não há dados para exibir com os filtros selecionados, ou a planilha online está vazia.")
-    st.warning("Se você acabou de rodar a automação, aguarde alguns instantes e atualize a página (F5).")
+    st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
+    st.warning("Se a automação acabou de ser executada, pode levar alguns instantes para os dados atualizarem. Tente recarregar a página (F5).")
