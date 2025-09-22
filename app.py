@@ -1,4 +1,4 @@
-# app.py - Versão 6.2: Correção de erro de data em planilhas sem datas válidas
+# app.py - Versão 6.5: Adicionados novos campos de pesquisa na barra lateral
 
 import streamlit as st
 import pandas as pd
@@ -7,7 +7,7 @@ from PIL import Image
 import time
 import gspread
 from gspread_dataframe import get_as_dataframe
-from datetime import date # Importa 'date' para usar como fallback
+from datetime import date
 
 # =================================================================================
 # --- CONFIGURAÇÃO E ESTILO ---
@@ -54,7 +54,7 @@ def carregar_dados_online():
             if col not in df.columns:
                 df[col] = pd.NA
         
-        df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], errors='coerce')
+        df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], format='%d/%m/%Y', errors='coerce')
         for col in ['Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário']:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         return df
@@ -74,12 +74,9 @@ df_filtrado = df.copy() if not df.empty else pd.DataFrame()
 
 if not df.empty:
     
-    # --- MUDANÇA CRÍTICA: Lógica de filtro de data mais robusta ---
     ativar_filtro_data = st.sidebar.checkbox("Filtrar por Período", value=True)
-
     datas_validas = df['Data Emissão'].dropna()
 
-    # Só mostra os seletores de data e aplica o filtro se o checkbox estiver marcado E existirem datas válidas
     if ativar_filtro_data and not datas_validas.empty:
         data_min_default = datas_validas.min().date()
         data_max_default = datas_validas.max().date()
@@ -87,12 +84,10 @@ if not df.empty:
         data_inicial = st.sidebar.date_input("Data Inicial", data_min_default, min_value=data_min_default, max_value=data_max_default)
         data_final = st.sidebar.date_input("Data Final", data_max_default, min_value=data_inicial, max_value=data_max_default)
         
-        # Aplica o filtro de data
         df_filtrado = df_filtrado[df_filtrado['Data Emissão'].dt.date.between(data_inicial, data_final)]
     elif ativar_filtro_data and datas_validas.empty:
         st.sidebar.warning("Nenhuma data válida encontrada para filtrar.")
 
-    # Filtros de Cliente e Item continuam normalmente
     clientes_unicos = sorted(df['Cliente'].astype(str).unique())
     if 'clientes_selecionados' not in st.session_state:
         st.session_state.clientes_selecionados = clientes_unicos
@@ -104,12 +99,29 @@ if not df.empty:
         st.session_state.clientes_selecionados = []
     
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, key='clientes_selecionados')
-    item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
 
+    # --- NOVIDADE: Novos campos de pesquisa ---
+    item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
+    nf_pesquisada = st.sidebar.text_input("Pesquisar por Nº da Nota")
+    pagamento_pesquisado = st.sidebar.text_input("Pesquisar por Forma de Pagto")
+    vendedor_pesquisado = st.sidebar.text_input("Pesquisar por Vendedor")
+
+
+    # Aplica os filtros na sequência
     if clientes_selecionados:
         df_filtrado = df_filtrado[df_filtrado['Cliente'].isin(clientes_selecionados)]
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
+    
+    # --- NOVIDADE: Lógica para os novos filtros ---
+    if nf_pesquisada:
+        # Converte a coluna 'Nota' para string para garantir que a pesquisa funcione
+        df_filtrado = df_filtrado[df_filtrado['Nota'].astype(str).str.contains(nf_pesquisada, case=False, na=False)]
+    if pagamento_pesquisado:
+        df_filtrado = df_filtrado[df_filtrado['Forma de Pagto'].str.contains(pagamento_pesquisado, case=False, na=False)]
+    if vendedor_pesquisado:
+        df_filtrado = df_filtrado[df_filtrado['Representante'].str.contains(vendedor_pesquisado, case=False, na=False)]
+
         
     st.sidebar.divider()
     st.sidebar.header("Download de Dados")
@@ -183,6 +195,7 @@ if not df.empty:
             Quantidade_Vendida=('Quantidade', 'sum'),
             Valor_Total_Vendido=('Total do Item', 'sum')
         ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
+        
         st.dataframe(ranking_produtos, width='stretch',
             column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
         )
@@ -205,6 +218,7 @@ if not df.empty:
         st.header("Consulta Detalhada dos Dados Filtrados")
         st.dataframe(df_filtrado, width='stretch',
             column_config={
+                "Data Emissão": st.column_config.DateColumn("Data de Emissão", format="DD/MM/YYYY"),
                 "Valor Unitário": st.column_config.NumberColumn(format="R$ %.2f"),
                 "Total do Item": st.column_config.NumberColumn(format="R$ %.2f"),
                 "Preço de Venda": st.column_config.NumberColumn(format="R$ %.2f"),
