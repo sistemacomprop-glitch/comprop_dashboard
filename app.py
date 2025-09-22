@@ -12,7 +12,7 @@ from gspread_dataframe import get_as_dataframe
 # --- CONFIGURAÇÃO E ESTILO ---
 # =================================================================================
 st.set_page_config(page_title="COMPROP | Dashboard", layout="wide")
-CAMINHO_LOGO = 'image_9b00e0.png' # A logo precisa estar na mesma pasta do app.py
+CAMINHO_LOGO = 'image_9b00e0.png' # A logo precisa estar na mesma pasta
 
 def carregar_css():
     css = """
@@ -50,11 +50,10 @@ def carregar_dados_online():
         df = get_as_dataframe(worksheet, evaluate_formulas=True)
         df.dropna(how='all', inplace=True)
         
-        # Assegura que as colunas essenciais existem antes de processar
         colunas_essenciais = ['Data Emissão', 'Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário', 'Cliente', 'Item Descrição', 'Movimentação', 'Representante', 'Nota']
         for col in colunas_essenciais:
             if col not in df.columns:
-                df[col] = pd.NA # Cria a coluna vazia se não existir
+                df[col] = pd.NA
         
         df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], errors='coerce')
         for col in ['Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário']:
@@ -65,7 +64,7 @@ def carregar_dados_online():
 df = carregar_dados_online()
 
 # =================================================================================
-# --- BARRA LATERAL (SIDEBAR) COM FILTROS ---
+# --- BARRA LATERAL (SIDEBAR) COM FILTROS E DOWNLOAD ---
 # =================================================================================
 st.sidebar.image(CAMINHO_LOGO)
 st.sidebar.title("Painel de Controle")
@@ -73,7 +72,7 @@ st.sidebar.divider()
 st.sidebar.header("Filtros de Análise")
 
 if not df.empty:
-    df_filtrado = df.copy() # Começa com o dataframe completo
+    df_filtrado = df.copy()
 
     data_min = df_filtrado['Data Emissão'].min().date()
     data_max = df_filtrado['Data Emissão'].max().date()
@@ -93,7 +92,6 @@ if not df.empty:
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, key='clientes_selecionados')
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
 
-    # Aplica os filtros
     df_filtrado = df_filtrado[
         (df_filtrado['Data Emissão'].dt.date >= data_inicial) &
         (df_filtrado['Data Emissão'].dt.date <= data_final) &
@@ -101,9 +99,23 @@ if not df.empty:
     ]
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
+        
+    st.sidebar.divider()
+    st.sidebar.header("Download de Dados")
+
+    csv = df_filtrado.to_csv(index=False).encode('utf-8')
+
+    st.sidebar.download_button(
+       label="📥 Baixar Dados Filtrados (.csv)",
+       data=csv,
+       file_name='dados_comprop_filtrados.csv',
+       mime='text/csv',
+       use_container_width=True
+    )
+
 else:
     st.sidebar.warning("Aguardando dados da nuvem...")
-    df_filtrado = pd.DataFrame() # Garante que df_filtrado existe mesmo se df estiver vazio
+    df_filtrado = pd.DataFrame()
 
 # =================================================================================
 # --- PÁGINA PRINCIPAL COM DASHBOARD ---
@@ -165,7 +177,7 @@ if not df_filtrado.empty:
             Valor_Total_Vendido=('Total do Item', 'sum')
         ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
         
-        st.dataframe(ranking_produtos, height=500, width='stretch',
+        st.dataframe(ranking_produtos, width='stretch',
             column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
         )
 
@@ -194,5 +206,5 @@ if not df_filtrado.empty:
             }
         )
 else:
-    st.info("Ainda não há dados para exibir. A planilha online pode estar vazia ou indisponível.")
+    st.info("Não há dados para exibir com os filtros selecionados, ou a planilha online está vazia.")
     st.warning("Se você acabou de rodar a automação, aguarde alguns instantes e atualize a página (F5).")
