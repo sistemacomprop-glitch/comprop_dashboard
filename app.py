@@ -1,4 +1,4 @@
-# app.py - Versão 6.0: Correção de perda de dados e adição de contadores (Completo)
+# app.py - Versão 6.2: Correção de erro de data em planilhas sem datas válidas
 
 import streamlit as st
 import pandas as pd
@@ -7,12 +7,13 @@ from PIL import Image
 import time
 import gspread
 from gspread_dataframe import get_as_dataframe
+from datetime import date # Importa 'date' para usar como fallback
 
 # =================================================================================
 # --- CONFIGURAÇÃO E ESTILO ---
 # =================================================================================
 st.set_page_config(page_title="COMPROP | Dashboard", layout="wide")
-CAMINHO_LOGO = 'image_9b00e0.png' # A logo precisa estar na mesma pasta
+CAMINHO_LOGO = 'image_9b00e0.png'
 
 def carregar_css():
     css = """
@@ -53,7 +54,6 @@ def carregar_dados_online():
             if col not in df.columns:
                 df[col] = pd.NA
         
-        # A linha que removia dados com data vazia foi permanentemente retirada.
         df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], errors='coerce')
         for col in ['Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário']:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -70,18 +70,30 @@ st.sidebar.title("Painel de Controle")
 st.sidebar.divider()
 st.sidebar.header("Filtros de Análise")
 
+df_filtrado = df.copy() if not df.empty else pd.DataFrame()
+
 if not df.empty:
-    df_filtrado = df.copy()
-
-    # Filtro de Data (ignora datas vazias/NaT para definir o range)
-    datas_validas = df_filtrado['Data Emissão'].dropna()
-    data_min = datas_validas.min().date()
-    data_max = datas_validas.max().date()
     
-    data_inicial = st.sidebar.date_input("Data Inicial", data_min, min_value=data_min, max_value=data_max)
-    data_final = st.sidebar.date_input("Data Final", data_max, min_value=data_inicial, max_value=data_max)
+    # --- MUDANÇA CRÍTICA: Lógica de filtro de data mais robusta ---
+    ativar_filtro_data = st.sidebar.checkbox("Filtrar por Período", value=True)
 
-    clientes_unicos = sorted(df_filtrado['Cliente'].astype(str).unique())
+    datas_validas = df['Data Emissão'].dropna()
+
+    # Só mostra os seletores de data e aplica o filtro se o checkbox estiver marcado E existirem datas válidas
+    if ativar_filtro_data and not datas_validas.empty:
+        data_min_default = datas_validas.min().date()
+        data_max_default = datas_validas.max().date()
+        
+        data_inicial = st.sidebar.date_input("Data Inicial", data_min_default, min_value=data_min_default, max_value=data_max_default)
+        data_final = st.sidebar.date_input("Data Final", data_max_default, min_value=data_inicial, max_value=data_max_default)
+        
+        # Aplica o filtro de data
+        df_filtrado = df_filtrado[df_filtrado['Data Emissão'].dt.date.between(data_inicial, data_final)]
+    elif ativar_filtro_data and datas_validas.empty:
+        st.sidebar.warning("Nenhuma data válida encontrada para filtrar.")
+
+    # Filtros de Cliente e Item continuam normalmente
+    clientes_unicos = sorted(df['Cliente'].astype(str).unique())
     if 'clientes_selecionados' not in st.session_state:
         st.session_state.clientes_selecionados = clientes_unicos
 
@@ -94,12 +106,8 @@ if not df.empty:
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, key='clientes_selecionados')
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
 
-    # Aplica os filtros
-    df_filtrado = df_filtrado[
-        (df_filtrado['Data Emissão'].dt.date >= data_inicial) &
-        (df_filtrado['Data Emissão'].dt.date <= data_final) &
-        (df_filtrado['Cliente'].isin(clientes_selecionados))
-    ]
+    if clientes_selecionados:
+        df_filtrado = df_filtrado[df_filtrado['Cliente'].isin(clientes_selecionados)]
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
         
@@ -118,7 +126,6 @@ if not df.empty:
 
 else:
     st.sidebar.warning("Aguardando dados da nuvem...")
-    df_filtrado = pd.DataFrame()
 
 # =================================================================================
 # --- PÁGINA PRINCIPAL COM DASHBOARD ---
@@ -126,7 +133,6 @@ else:
 st.title("Dashboard de Análise de Vendas")
 
 if not df.empty:
-    # Contador de Registros para transparência
     st.info(f"Exibindo **{len(df_filtrado):,}** de **{len(df):,}** registros totais.")
     st.divider()
 
@@ -136,9 +142,7 @@ if not df.empty:
     ])
 
     with tab1:
-        tipo_analise = st.radio(
-            "Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True
-        )
+        tipo_analise = st.radio("Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True)
         st.divider()
 
         if tipo_analise == "Vendas":
@@ -147,12 +151,10 @@ if not df.empty:
             total_vendas = df_vendas['Total do Item'].sum()
             total_custo_vendas = (df_vendas['Custo Total']).sum()
             lucro_bruto = total_vendas - total_custo_vendas
-            
             col1, col2, col3 = st.columns(3)
             col1.metric("Vendas Totais", f"R$ {total_vendas:,.2f}")
             col2.metric("Custo das Vendas", f"R$ {total_custo_vendas:,.2f}")
             col3.metric("Lucro Bruto", f"R$ {lucro_bruto:,.2f}")
-
             st.subheader("Vendas por Cliente")
             vendas_por_cliente = df_vendas.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False)
             st.bar_chart(vendas_por_cliente)
@@ -162,11 +164,9 @@ if not df.empty:
             st.subheader("Resumo de Compras")
             total_compras = df_compras['Total do Item'].sum()
             num_notas_compra = df_compras['Nota'].nunique()
-
             col1, col2 = st.columns(2)
             col1.metric("Total de Compras", f"R$ {total_compras:,.2f}")
             col2.metric("Notas de Compra", f"{num_notas_compra}")
-
             st.subheader("Maiores Compras (por Fornecedor/Cliente)")
             compras_por_fornecedor = df_compras.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False).nlargest(15)
             st.bar_chart(compras_por_fornecedor)
@@ -183,7 +183,6 @@ if not df.empty:
             Quantidade_Vendida=('Quantidade', 'sum'),
             Valor_Total_Vendido=('Total do Item', 'sum')
         ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
-        
         st.dataframe(ranking_produtos, width='stretch',
             column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
         )
