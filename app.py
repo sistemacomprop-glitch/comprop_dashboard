@@ -1,27 +1,18 @@
-# app.py - Versão corrigida com ajustes de layout e limpeza da interface
+# app.py - Versão Completa para Deploy (Apenas Dashboard Online)
 
 import streamlit as st
 import pandas as pd
 import os
 from PIL import Image
 import time
-
-# Importamos a função principal que faz todo o trabalho pesado do nosso outro arquivo.
-from automatizadorstream import executar_processo_completo
-
-# =================================================================================
-# --- CONFIGURAÇÃO DE CAMINHOS ---
-# =================================================================================
-PASTA_RAIZ_RELATORIOS = r'C:\Users\consultor.ale\Desktop\Mamede\Relatórios\MOVIMENTACOES'
-PALAVRA_CHAVE_INVENTARIO = 'ppReport1inventario'
-CAMINHO_EXCEL_FINAL = r'G:\Meu Drive\Relatorio_Final_App.xlsx'
-CAMINHO_LOGO = r'C:\Users\consultor.ale\Desktop\Mamede\image_9b00e0.png'
-
+import gspread
+from gspread_dataframe import get_as_dataframe
 
 # =================================================================================
-# --- ESTILO E CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURAÇÃO E ESTILO ---
 # =================================================================================
 st.set_page_config(page_title="COMPROP | Dashboard", layout="wide")
+CAMINHO_LOGO = 'image_9b00e0.png' # A logo precisa estar na mesma pasta do app.py
 
 def carregar_css():
     css = """
@@ -36,56 +27,60 @@ def carregar_css():
 carregar_css()
 
 # =================================================================================
-# --- FUNÇÃO DE CACHE PARA CARREGAR OS DADOS ---
+# --- CONEXÃO SEGURA E CARREGAMENTO DE DADOS DO GOOGLE SHEETS ---
 # =================================================================================
-@st.cache_data
-def carregar_dados(caminho_arquivo):
-    if os.path.exists(caminho_arquivo):
-        try:
-            df = pd.read_excel(caminho_arquivo)
-            df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], format='%d/%m/%Y', errors='coerce')
-            for col in ['Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário']:
-                df[col] = pd.to_numeric(df[col].astype(str).str.replace('.', '').str.replace(',', '.'), errors='coerce').fillna(0)
-            return df
-        except Exception as e:
-            st.error(f"Erro ao carregar ou processar o arquivo Excel: {e}")
-            return pd.DataFrame()
+# Função para conectar ao Google Sheets usando os "Secrets" do Streamlit
+def conectar_google_sheets():
+    try:
+        creds_dict = st.secrets["gcp_service_account"]
+        gc = gspread.service_account_from_dict(creds_dict)
+        spreadsheet = gc.open("COMPROP_Dashboard_Data") # Nome da sua planilha no Drive
+        worksheet = spreadsheet.sheet1
+        return worksheet
+    except Exception as e:
+        st.error("Falha na conexão com o Google Sheets. Verifique os 'Secrets' e o compartilhamento da planilha.")
+        st.exception(e)
+        return None
+
+# Função para carregar os dados (com cache para performance)
+@st.cache_data(ttl=600) # O cache expira a cada 10 minutos
+def carregar_dados_online():
+    worksheet = conectar_google_sheets()
+    if worksheet:
+        df = get_as_dataframe(worksheet, evaluate_formulas=True)
+        df.dropna(how='all', inplace=True)
+        
+        # Assegura que as colunas essenciais existem antes de processar
+        colunas_essenciais = ['Data Emissão', 'Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário', 'Cliente', 'Item Descrição', 'Movimentação', 'Representante', 'Nota']
+        for col in colunas_essenciais:
+            if col not in df.columns:
+                df[col] = pd.NA # Cria a coluna vazia se não existir
+        
+        df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], errors='coerce')
+        for col in ['Total do Item', 'Preço de Custo', 'Quantidade', 'Valor Unitário']:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        return df
     return pd.DataFrame()
 
-df = carregar_dados(CAMINHO_EXCEL_FINAL)
+df = carregar_dados_online()
 
 # =================================================================================
-# --- BARRA LATERAL (SIDEBAR) ---
+# --- BARRA LATERAL (SIDEBAR) COM FILTROS ---
 # =================================================================================
 st.sidebar.image(CAMINHO_LOGO)
 st.sidebar.title("Painel de Controle")
 st.sidebar.divider()
-
-st.sidebar.header("Executar Automação")
-if st.sidebar.button("▶️ Iniciar Extração de Dados", type="primary"):
-    with st.spinner('Aguarde... O robô está trabalhando...'):
-        try:
-            df_resultado = executar_processo_completo(PASTA_RAIZ_RELATORIOS, PALAVRA_CHAVE_INVENTARIO)
-            df_resultado.to_excel(CAMINHO_EXCEL_FINAL, index=False)
-            st.cache_data.clear()
-            st.success("Automação concluída com sucesso! A página será recarregada com os novos dados.")
-            st.balloons()
-            time.sleep(3)
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error("Ocorreu um erro na automação.")
-            st.exception(e)
-
-st.sidebar.divider()
 st.sidebar.header("Filtros de Análise")
 
 if not df.empty:
-    data_min = df['Data Emissão'].min().date()
-    data_max = df['Data Emissão'].max().date()
+    df_filtrado = df.copy() # Começa com o dataframe completo
+
+    data_min = df_filtrado['Data Emissão'].min().date()
+    data_max = df_filtrado['Data Emissão'].max().date()
     data_inicial = st.sidebar.date_input("Data Inicial", data_min, min_value=data_min, max_value=data_max)
     data_final = st.sidebar.date_input("Data Final", data_max, min_value=data_inicial, max_value=data_max)
 
-    clientes_unicos = sorted(df['Cliente'].unique())
+    clientes_unicos = sorted(df_filtrado['Cliente'].astype(str).unique())
     if 'clientes_selecionados' not in st.session_state:
         st.session_state.clientes_selecionados = clientes_unicos
 
@@ -95,44 +90,40 @@ if not df.empty:
     if col2.button("Limpar Seleção", use_container_width=True):
         st.session_state.clientes_selecionados = []
     
-    # --- CORREÇÃO: O seletor de clientes agora está corretamente na sidebar ---
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, key='clientes_selecionados')
-    
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
 
-    df_filtrado = df[
-        (df['Data Emissão'].dt.date >= data_inicial) &
-        (df['Data Emissão'].dt.date <= data_final) &
-        (df['Cliente'].isin(clientes_selecionados))
+    # Aplica os filtros
+    df_filtrado = df_filtrado[
+        (df_filtrado['Data Emissão'].dt.date >= data_inicial) &
+        (df_filtrado['Data Emissão'].dt.date <= data_final) &
+        (df_filtrado['Cliente'].isin(clientes_selecionados))
     ]
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
 else:
-    st.sidebar.warning("Execute a automação para habilitar os filtros.")
+    st.sidebar.warning("Aguardando dados da nuvem...")
+    df_filtrado = pd.DataFrame() # Garante que df_filtrado existe mesmo se df estiver vazio
 
 # =================================================================================
-# --- PÁGINA PRINCIPAL COM ABAS ---
+# --- PÁGINA PRINCIPAL COM DASHBOARD ---
 # =================================================================================
 st.title("Dashboard de Análise de Vendas")
 
-if not df.empty:
+if not df_filtrado.empty:
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Dashboard Geral", "📈 Entradas vs. Saídas", "🏆 Ranking de Produtos", 
         "👑 Ranking Vendedores", "📋 Consulta Detalhada"
     ])
 
     with tab1:
-        # --- CORREÇÃO: Título removido e seletor agora é o principal elemento ---
         tipo_analise = st.radio(
-            "Selecione a visão do Dashboard:",
-            ["Vendas", "Compras"],
-            horizontal=True
+            "Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True
         )
         st.divider()
 
         if tipo_analise == "Vendas":
             df_vendas = df_filtrado[df_filtrado['Movimentação'] == 'Saída']
-            
             st.subheader("Resumo de Vendas")
             total_vendas = df_vendas['Total do Item'].sum()
             total_custo_vendas = (df_vendas['Preço de Custo'] * df_vendas['Quantidade']).sum()
@@ -143,15 +134,12 @@ if not df.empty:
             col2.metric("Custo das Vendas", f"R$ {total_custo_vendas:,.2f}")
             col3.metric("Lucro Bruto", f"R$ {lucro_bruto:,.2f}")
 
-            # --- CORREÇÃO: Gráfico de Top Produtos foi removido desta aba ---
-
             st.subheader("Vendas por Cliente")
             vendas_por_cliente = df_vendas.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False)
             st.bar_chart(vendas_por_cliente)
 
         elif tipo_analise == "Compras":
             df_compras = df_filtrado[df_filtrado['Movimentação'] == 'Entrada']
-            
             st.subheader("Resumo de Compras")
             total_compras = df_compras['Total do Item'].sum()
             num_notas_compra = df_compras['Nota'].nunique()
@@ -164,7 +152,6 @@ if not df.empty:
             compras_por_fornecedor = df_compras.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False).nlargest(15)
             st.bar_chart(compras_por_fornecedor)
 
-    # O restante das abas continua o mesmo
     with tab2:
         st.header("Comparativo de Entradas vs. Saídas")
         movimentacao_diaria = df_filtrado.groupby([df_filtrado['Data Emissão'].dt.date, 'Movimentação'])['Total do Item'].sum().unstack(fill_value=0)
@@ -178,7 +165,7 @@ if not df.empty:
             Valor_Total_Vendido=('Total do Item', 'sum')
         ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
         
-        st.dataframe(ranking_produtos, height=500, use_container_width=True,
+        st.dataframe(ranking_produtos, height=500, width='stretch',
             column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
         )
 
@@ -190,7 +177,7 @@ if not df.empty:
                 Valor_Total_Vendido=('Total do Item', 'sum'),
                 Quantidade_de_Vendas=('Nota', 'nunique')
             ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
-            st.dataframe(ranking_vendedores, use_container_width=True,
+            st.dataframe(ranking_vendedores, width='stretch',
                 column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
             )
         else:
@@ -198,7 +185,7 @@ if not df.empty:
 
     with tab5:
         st.header("Consulta Detalhada dos Dados Filtrados")
-        st.dataframe(df_filtrado, use_container_width=True,
+        st.dataframe(df_filtrado, width='stretch',
             column_config={
                 "Valor Unitário": st.column_config.NumberColumn(format="R$ %.2f"),
                 "Total do Item": st.column_config.NumberColumn(format="R$ %.2f"),
@@ -207,4 +194,5 @@ if not df.empty:
             }
         )
 else:
-    st.info("Ainda não há dados para exibir. Por favor, execute a automação na barra lateral.")
+    st.info("Ainda não há dados para exibir. A planilha online pode estar vazia ou indisponível.")
+    st.warning("Se você acabou de rodar a automação, aguarde alguns instantes e atualize a página (F5).")
