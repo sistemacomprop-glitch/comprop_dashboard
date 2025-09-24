@@ -7,7 +7,7 @@ PALAVRA_CHAVE_INVENTARIO = 'ppReport1inventario'
 NOME_PLANILHA_ONLINE = "COMPROP_Dashboard_Data"
 CAMINHO_CREDENCIAS_JSON = "credentials.json"
 CAMINHO_EXCEL_LOCAL = r'C:\Users\consultor.ale\Desktop\Mamede\Relatórios\COMPROP_Dashboard_Data_Local.xlsx'
-CAMINHO_LOGO = r'C:\Users\consultor.ale\Desktop\Mamede\image_9b00e0.png'
+CAMINHO_LOGO = 'image_9b00e0.png'
 
 # --- Dicionário de Mapeamento de Movimentação ---
 movimentacao_map = {
@@ -29,4 +29,5 @@ movimentacao_map = {
     "2-DEVOLUCAO DE VENDA NF PROPRIA": "Entrada", "417-AQUISIÇÃO DE SERVIÇOS - MANUT. MAQU. E EQUIPAMENTOS": "Entrada",
     "441-AQUISIÇÃO DE SERVIÇOS - RET. FEDERAIS": "Entrada", "6-CONTA MOVIMENTO": "Sem Movimentação",
     "1-À VISTA": "Sem Movimentação", "8-À VISTA ENTRADAS": "Sem Movimentação", "3-PAGAMENTO A PRAZO": "Sem Movimentação",
+
 }
