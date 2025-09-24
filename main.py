@@ -1,17 +1,23 @@
-# main.py (Versão 7.1 - Salvando múltiplas abas no Excel)
+# main.py - Versão 7.1: Final, Completa e Unificada (Online/Offline)
 
 import os
 import glob
 from datetime import date, timedelta
 import pandas as pd
 
+# Importa as configurações e as funções de cada módulo especializado
 from config import *
 from rpa_module import executar_rpa_extracao
 from pdf_parser_module import orquestrar_extracao_movimentacoes, orquestrar_extracao_inventario
 from data_processor_module import unir_dataframes
 from google_sheets_module import buscar_dados_existentes, atualizar_dados_no_google_sheets
 
-MODO_ONLINE = False
+# =================================================================================
+# --- CHAVE SELETORA DE MODO DE OPERAÇÃO ---
+# =================================================================================
+MODO_ONLINE = True # Mude para True quando a API do Google voltar a funcionar
+
+# =================================================================================
 
 def executar_processo_de_dados(pasta_raiz_relatorios, palavra_chave_inventario):
     """
@@ -39,23 +45,27 @@ def executar_processo_de_dados(pasta_raiz_relatorios, palavra_chave_inventario):
     print(f"  > {len(lista_pdfs_movimentacao)} arquivo(s) de movimentação encontrados.")
 
     df_movs = orquestrar_extracao_movimentacoes(lista_pdfs_movimentacao)
-    df_inv = orquestrar_extracao_inventario(caminho_pdf_inventario)
+    df_inv_bruto = orquestrar_extracao_inventario(caminho_pdf_inventario)
     
-    if df_movs is None or df_inv is None:
+    if df_movs is None or df_inv_bruto is None:
         raise ValueError("Falha no processamento dos PDFs. Um dos DataFrames está vazio.")
         
-    df_final = unir_dataframes(df_movs, df_inv)
+    df_final_movimentacoes = unir_dataframes(df_movs, df_inv_bruto)
     
-    # MUDANÇA: Retorna os dois dataframes
-    return df_final, df_inv
+    # Retorna os dois dataframes
+    return df_final_movimentacoes, df_inv_bruto
 
 
+# =================================================================================
+# BLOCO PRINCIPAL (ORQUESTRADOR)
+# =================================================================================
 if __name__ == "__main__":
+    
     if MODO_ONLINE:
         # --- LÓGICA DO MODO ONLINE (INCREMENTAL) ---
         print("Executando em MODO ONLINE...")
         try:
-            df_existentes = buscar_dados_existentes(NOME_PLANILHA_ONLINE, CAMINHO_CREDENCIAS_JSON)
+            df_existentes, _ = buscar_dados_existentes(NOME_PLANILHA_ONLINE, CAMINHO_CREDENCIAS_JSON)
             hoje = date.today()
             if not df_existentes.empty and not df_existentes['Data Emissão'].dropna().empty:
                 ultima_data = df_existentes['Data Emissão'].dropna().max().date()
@@ -71,16 +81,17 @@ if __name__ == "__main__":
             if not sucesso_rpa:
                 raise RuntimeError("A automação (RPA) falhou.")
 
-            novos_dados_df = executar_processo_de_dados(PASTA_RAIZ_RELATORIOS, PALAVRA_CHAVE_INVENTARIO)
+            novos_dados_df, df_inventario_novo = executar_processo_de_dados(PASTA_RAIZ_RELATORIOS, PALAVRA_CHAVE_INVENTARIO)
             if novos_dados_df is not None and not novos_dados_df.empty:
-                atualizar_dados_no_google_sheets(novos_dados_df, df_existentes, NOME_PLANILHA_ONLINE, CAMINHO_CREDENCIAS_JSON)
+                atualizar_dados_no_google_sheets(novos_dados_df, df_existentes, df_inventario_novo, NOME_PLANILHA_ONLINE, CAMINHO_CREDENCIAS_JSON)
             else:
                 print("Nenhum dado novo foi encontrado para adicionar à planilha.")
         except Exception as e:
             print(f"\n--- ERRO NA EXECUÇÃO ONLINE ---")
             print(e)
+            
     else:
-        # LÓGICA DO MODO LOCAL (SOBRESCRITA)
+        # --- LÓGICA DO MODO LOCAL (SOBRESCRITA) ---
         print("Executando em MODO LOCAL...")
         try:
             hoje = date.today()
@@ -92,13 +103,11 @@ if __name__ == "__main__":
             if not sucesso_rpa:
                 raise RuntimeError("A automação (RPA) falhou.")
 
-            # MUDANÇA: Recebe os dois dataframes
             df_movimentacoes_final, df_inventario_bruto = executar_processo_de_dados(PASTA_RAIZ_RELATORIOS, PALAVRA_CHAVE_INVENTARIO)
             
             if df_movimentacoes_final is not None and not df_movimentacoes_final.empty:
                 print(f"\n--- MODO LOCAL: Salvando resultado com 2 abas em '{CAMINHO_EXCEL_LOCAL}' ---")
                 
-                # MUDANÇA: Usa o ExcelWriter para salvar múltiplas abas
                 with pd.ExcelWriter(CAMINHO_EXCEL_LOCAL, engine='openpyxl') as writer:
                     df_movimentacoes_final.to_excel(writer, sheet_name='Movimentacoes', index=False)
                     df_inventario_bruto.to_excel(writer, sheet_name='Estoque', index=False)
