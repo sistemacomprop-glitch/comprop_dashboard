@@ -161,7 +161,6 @@ df = df_movimentacoes # Define o df principal para os filtros
 # =================================================================================
 st.sidebar.image(CAMINHO_LOGO)
 st.sidebar.title("Painel de Controle")
-st.sidebar.divider()
 st.sidebar.header("Filtros de Análise")
 
 df_filtrado = df.copy() if not df.empty else pd.DataFrame()
@@ -226,7 +225,6 @@ st.title("Dashboard de Análise e Estoque")
 
 if not df.empty:
     st.info(f"Exibindo **{len(df_filtrado):,}** de **{len(df):,}** registros totais (movimentações).")
-    st.divider()
 
     tab_list = [
         "📊 Dashboard Geral", "📈 Entradas vs. Saídas", "🏆 Ranking de Produtos", 
@@ -242,7 +240,6 @@ if not df.empty:
 
     with tabs[0]: # Dashboard Geral
         tipo_analise = st.radio("Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True)
-        st.divider()
         if tipo_analise == "Vendas":
             df_vendas = df_filtrado[df_filtrado['Movimentação'] == 'Saída']
             st.subheader("Resumo de Vendas")
