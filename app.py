@@ -74,12 +74,37 @@ def carregar_dados():
         if 'Data de Vencimento' in df_mov.columns:
             df_mov['Data de Vencimento'] = pd.to_datetime(df_mov['Data de Vencimento'], format='%d/%m/%Y', errors='coerce')
 
-    # Limpeza do DataFrame de Estoque
+    # --- INÍCIO DA CORREÇÃO ---
+    # Limpeza do DataFrame de Estoque com lógica de conversão robusta
     if not df_est.empty:
         df_est.columns = df_est.columns.str.strip()
+        
+        # Função auxiliar para limpar e converter os números de forma segura
+        def clean_and_convert_decimal(series):
+            # 1. Garante que tudo é string e troca vírgula por ponto para padronizar o decimal
+            temp_series = series.astype(str).str.replace(',', '.', regex=False)
+
+            # 2. Função interna para remover os pontos de milhar, preservando o último ponto (decimal)
+            def remove_thousands_separator(value):
+                # Ignora valores nulos ou inválidos
+                if pd.isna(value) or value is None:
+                    return None
+                parts = str(value).split('.')
+                # Se o número tiver múltiplos pontos (ex: 1.234.56), junta a parte inteira
+                if len(parts) > 1:
+                    return "".join(parts[:-1]) + "." + parts[-1]
+                # Se não tiver ponto ou tiver apenas um, retorna como está
+                return value
+
+            # 3. Aplica a limpeza e converte para o formato numérico final
+            cleaned_series = temp_series.apply(remove_thousands_separator)
+            return pd.to_numeric(cleaned_series, errors='coerce').fillna(0)
+
+        # Aplica a função de limpeza nas colunas numéricas do estoque
         for col in ['Saldo', 'Custo Unit.', 'Custo Total']:
              if col in df_est.columns:
-                df_est[col] = pd.to_numeric(df_est[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+                df_est[col] = clean_and_convert_decimal(df_est[col])
+    # --- FIM DA CORREÇÃO ---
 
     return df_mov, df_est
 
