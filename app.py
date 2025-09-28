@@ -161,7 +161,6 @@ df = df_movimentacoes # Define o df principal para os filtros
 # =================================================================================
 st.sidebar.image(CAMINHO_LOGO)
 st.sidebar.title("Painel de Controle")
-st.sidebar.header("Filtros de Análise")
 
 df_filtrado = df.copy() if not df.empty else pd.DataFrame()
 
@@ -415,3 +414,4 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
+
