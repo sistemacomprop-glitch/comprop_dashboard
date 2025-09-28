@@ -135,10 +135,6 @@ df = df_movimentacoes # Define o df principal para os filtros
 # =================================================================================
 st.sidebar.image(CAMINHO_LOGO)
 st.sidebar.title("Painel de Controle")
-if MODO_ONLINE:
-    st.sidebar.success("Modo: Online ☁️")
-else:
-    st.sidebar.warning("Modo: Local 💻")
 st.sidebar.divider()
 st.sidebar.header("Filtros de Análise")
 
