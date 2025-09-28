@@ -7,6 +7,7 @@ from PIL import Image
 from datetime import date
 import gspread
 from gspread_dataframe import get_as_dataframe
+import io
 
 
 # Importa as configurações do arquivo central
@@ -224,8 +225,22 @@ if not df.empty:
         
     st.sidebar.divider()
     st.sidebar.header("Download de Dados")
-    csv = df_filtrado.to_csv(index=False).encode('utf-8')
-    st.sidebar.download_button(label="📥 Baixar Dados Filtrados (.csv)", data=csv, file_name='dados_comprop_filtrados.csv', mime='text/csv', use_container_width=True)
+    # --- NOVO BLOCO PARA GERAR XLSX ---
+    # Cria um "arquivo" Excel em memória para não precisar salvar no disco
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_filtrado.to_excel(writer, index=False, sheet_name='Dados')
+
+    # Pega o conteúdo do arquivo em memória
+    excel_data = output.getvalue()
+
+    st.sidebar.download_button(
+        label="📥 Baixar Dados Filtrados (.xlsx)",
+        data=excel_data,
+        file_name='dados_comprop_filtrados.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', # MIME type para arquivos XLSX
+        use_container_width=True
+    )
 else:
     st.sidebar.warning("Nenhum dado carregado.")
 
