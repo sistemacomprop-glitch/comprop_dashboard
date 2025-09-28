@@ -314,7 +314,7 @@ if not df.empty:
             
             st.dataframe(df_estoque_filtrado, width='stretch',
                 column_config={
-                    "Custo Unit.": st.column_config.NumberColumn("Custo Unitário", format="R$ %.2f"),
+                    "Custo Unit": st.column_config.NumberColumn("Custo Unit", format="R$ %.2f"),
                     "Custo Total": st.column_config.NumberColumn("Custo Total", format="R$ %.2f"),
                 }
             )
