@@ -276,6 +276,7 @@ if not df.empty:
             st.header("Demonstração do Resultado (DRE Simplificado)")
             st.write("Análise financeira baseada na classificação DRE para o período filtrado.")
             
+            # Calcula os totais para cada categoria do DRE
             dre_summary = df_filtrado.groupby('Classificação DRE')['Total do Item'].sum()
 
             receita = dre_summary.get('Receita', 0)
@@ -288,32 +289,58 @@ if not df.empty:
             resultado_bruto = receita_liquida - (custos - reducao_custos)
             resultado_final = resultado_bruto - despesas
 
-            st.subheader("Estrutura do Resultado")
-            col1, col2 = st.columns([3, 1])
-            col1.text("(=) Receita Operacional Bruta")
-            col2.metric("", f"R$ {receita:,.2f}")
-            col1.text("(-) Deduções da Receita")
-            col2.metric("", f"R$ {deducoes:,.2f}")
-            col1.markdown("**(=) Receita Operacional Líquida**")
-            col2.metric("", f"**R$ {receita_liquida:,.2f}**")
-            col1.text("(-) Custo (Mercadorias e Serviços)")
-            col2.metric("", f"R$ {custos - reducao_custos:,.2f}")
-            col1.markdown("**(=) Resultado Bruto (Lucro Bruto)**")
-            col2.metric("", f"**R$ {resultado_bruto:,.2f}**")
-            col1.text("(-) Despesas Operacionais")
-            col2.metric("", f"R$ {despesas:,.2f}")
-            st.divider()
-            col1.markdown("### (=) Resultado Líquido do Período")
-            col2.metric("", f"### R$ {resultado_final:,.2f}")
-            st.divider()
+            # Exibe os KPIs em colunas, como no Dashboard Geral
+            st.subheader("Indicadores Principais do Período")
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Receita Líquida", f"R$ {receita_liquida:,.2f}")
+            col2.metric("Custos", f"R$ {custos - reducao_custos:,.2f}")
+            col3.metric("Despesas", f"R$ {despesas:,.2f}")
+            col4.metric("Resultado Líquido", f"R$ {resultado_final:,.2f}")
             
-            st.subheader("Composição das Despesas")
-            df_despesas = df_filtrado[df_filtrado['Classificação DRE'] == 'Despesa']
-            if not df_despesas.empty:
-                despesas_por_operacao = df_despesas.groupby('Tipo de Operação')['Total do Item'].sum().nlargest(10)
-                st.bar_chart(despesas_por_operacao)
-            else:
-                st.info("Nenhuma despesa registrada no período filtrado.")
+            st.divider()
+
+            # Exibe os gráficos de composição
+            col_graf1, col_graf2 = st.columns(2)
+            
+            with col_graf1:
+                st.subheader("Maiores Fontes de Receita")
+                df_receitas = df_filtrado[df_filtrado['Classificação DRE'] == 'Receita']
+                if not df_receitas.empty:
+                    receitas_por_operacao = df_receitas.groupby('Tipo de Operação')['Total do Item'].sum().nlargest(10)
+                    st.bar_chart(receitas_por_operacao)
+                else:
+                    st.info("Nenhuma receita registrada no período filtrado.")
+
+            with col_graf2:
+                st.subheader("Maiores Despesas")
+                df_despesas = df_filtrado[df_filtrado['Classificação DRE'] == 'Despesa']
+                if not df_despesas.empty:
+                    despesas_por_operacao = df_despesas.groupby('Tipo de Operação')['Total do Item'].sum().nlargest(10)
+                    st.bar_chart(despesas_por_operacao)
+                else:
+                    st.info("Nenhuma despesa registrada no período filtrado.")
+
+            # Expander para a visualização detalhada em texto
+            with st.expander("Ver DRE Detalhado (Formato de Lista)"):
+                st.subheader("Estrutura do Resultado")
+                dcol1, dcol2 = st.columns([3, 1])
+                dcol1.text("(=) Receita Operacional Bruta")
+                dcol2.metric("", f"R$ {receita:,.2f}")
+                dcol1.text("(-) Deduções da Receita")
+                dcol2.metric("", f"R$ {deducoes:,.2f}")
+                dcol1.markdown("**(=) Receita Operacional Líquida**")
+                dcol2.metric("", f"**R$ {receita_liquida:,.2f}**")
+                dcol1.text("(-) Custo (Mercadorias e Serviços)")
+                dcol2.metric("", f"R$ {custos - reducao_custos:,.2f}")
+                dcol1.markdown("**(=) Resultado Bruto (Lucro Bruto)**")
+                dcol2.metric("", f"**R$ {resultado_bruto:,.2f}**")
+                dcol1.text("(-) Despesas Operacionais")
+                dcol2.metric("", f"R$ {despesas:,.2f}")
+                st.divider()
+                dcol1.markdown("### (=) Resultado Líquido do Período")
+                dcol2.metric("", f"### R$ {resultado_final:,.2f}")
+    else:
+        st.error("A coluna 'Classificação DRE' não foi encontrada para gerar esta aba.")
 else:
     if MODO_ONLINE:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
