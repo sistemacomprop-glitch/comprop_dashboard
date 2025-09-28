@@ -1,41 +1,81 @@
-# app_utils.py
-# Módulo com funções utilitárias para o app Streamlit.
+# app_utils.py (Versão Final com Lógica Online/Offline)
 
 import streamlit as st
 import pandas as pd
 import os
 from datetime import date
-from config import CAMINHO_LOGO, CAMINHO_EXCEL_LOCAL
+import gspread
+from gspread_dataframe import get_as_dataframe
+
+# Importa as configurações do arquivo central
+from config import CAMINHO_LOGO, CAMINHO_EXCEL_LOCAL, MODO_ONLINE, NOME_PLANILHA_ONLINE
+
+def _limpar_df_movimentacoes(df):
+    """Função interna para limpar o dataframe de movimentações."""
+    if not df.empty:
+        df.columns = df.columns.str.strip()
+        if 'Data Emissão' in df.columns:
+            df['Data Emissão'] = pd.to_datetime(df['Data Emissão'], format='%d/%m/%Y', errors='coerce')
+        if 'Data de Vencimento' in df.columns:
+            df['Data de Vencimento'] = pd.to_datetime(df['Data de Vencimento'], format='%d/%m/%Y', errors='coerce')
+    return df
+
+def _limpar_df_estoque(df):
+    """Função interna para limpar o dataframe de estoque."""
+    if not df.empty:
+        df.columns = df.columns.str.strip()
+        for col in ['Saldo', 'Custo Unit.', 'Custo Total']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+    return df
 
 @st.cache_data(ttl=600)
 def carregar_dados():
-    """Carrega os dados das duas abas (Movimentacoes e Estoque) do arquivo local."""
-    if os.path.exists(CAMINHO_EXCEL_LOCAL):
-        dados_excel = pd.read_excel(CAMINHO_EXCEL_LOCAL, sheet_name=None)
-        df_mov = dados_excel.get('Movimentacoes', pd.DataFrame())
-        df_est = dados_excel.get('Estoque', pd.DataFrame())
-        
-        # Limpeza de dados...
-        if not df_mov.empty:
-            df_mov.columns = df_mov.columns.str.strip()
-            df_mov['Data Emissão'] = pd.to_datetime(df_mov['Data Emissão'], format='%d/%m/%Y', errors='coerce')
-            df_mov['Data de Vencimento'] = pd.to_datetime(df_mov['Data de Vencimento'], format='%d/%m/%Y', errors='coerce')
-        if not df_est.empty:
-            df_est.columns = df_est.columns.str.strip()
+    """Função mestra que decide se carrega os dados do arquivo local ou online."""
+    if MODO_ONLINE:
+        try:
+            creds_dict = st.secrets["gcp_service_account"]
+            gc = gspread.service_account_from_dict(creds_dict)
+            spreadsheet = gc.open(NOME_PLANILHA_ONLINE)
+            
+            mov_sheet = spreadsheet.worksheet('Movimentacoes')
+            est_sheet = spreadsheet.worksheet('Estoque')
+            
+            df_mov = get_as_dataframe(mov_sheet, evaluate_formulas=True)
+            df_est = get_as_dataframe(est_sheet, evaluate_formulas=True)
+            
+            return _limpar_df_movimentacoes(df_mov), _limpar_df_estoque(df_est)
 
-        return df_mov, df_est
-    return pd.DataFrame(), pd.DataFrame()
+        except Exception as e:
+            st.error("Falha ao carregar dados online.")
+            st.exception(e)
+            return pd.DataFrame(), pd.DataFrame()
+    else: # Modo Local
+        try:
+            if os.path.exists(CAMINHO_EXCEL_LOCAL):
+                dados_excel = pd.read_excel(CAMINHO_EXCEL_LOCAL, sheet_name=None)
+                df_mov = dados_excel.get('Movimentacoes', pd.DataFrame())
+                df_est = dados_excel.get('Estoque', pd.DataFrame())
+                return _limpar_df_movimentacoes(df_mov), _limpar_df_estoque(df_est)
+            else:
+                return pd.DataFrame(), pd.DataFrame()
+        except Exception as e:
+            st.error(f"Erro ao carregar o arquivo Excel local: {e}")
+            return pd.DataFrame(), pd.DataFrame()
 
 def construir_sidebar(df):
     """Cria a barra lateral com logo e filtros, e retorna o dataframe filtrado."""
     st.sidebar.image(CAMINHO_LOGO)
     st.sidebar.title("Painel de Controle")
-    st.sidebar.warning("Modo: Local 💻")
+    if MODO_ONLINE:
+        st.sidebar.success("Modo: Online ☁️")
+    else:
+        st.sidebar.warning("Modo: Local 💻")
     st.sidebar.divider()
     st.sidebar.header("Filtros de Análise")
 
     if df.empty:
-        st.sidebar.warning("Nenhum dado carregado.")
+        st.sidebar.warning("Nenhum dado de movimentação carregado.")
         return pd.DataFrame()
 
     df_filtrado = df.copy()

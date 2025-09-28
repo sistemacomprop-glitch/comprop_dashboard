@@ -1,5 +1,5 @@
-# config.py
-# Este arquivo centraliza todas as variáveis de configuração do projeto.
+# Mude para False para usar o arquivo Excel local
+MODO_ONLINE = True 
 
 # --- Caminhos e Nomes de Arquivos ---
 PASTA_RAIZ_RELATORIOS = r'C:\Users\consultor.ale\Desktop\Mamede\Relatórios\MOVIMENTACOES'
@@ -7,7 +7,7 @@ PALAVRA_CHAVE_INVENTARIO = 'ppReport1inventario'
 NOME_PLANILHA_ONLINE = "COMPROP_Dashboard_Data"
 CAMINHO_CREDENCIAS_JSON = "credentials.json"
 CAMINHO_EXCEL_LOCAL = r'C:\Users\consultor.ale\Desktop\Mamede\Relatórios\COMPROP_Dashboard_Data_Local.xlsx'
-CAMINHO_LOGO = 'image_9b00e0.png'
+CAMINHO_LOGO = r'C:\Users\consultor.ale\Desktop\Mamede\image_9b00e0.png'
 
 # --- Dicionário de Mapeamento de Movimentação ---
 
@@ -119,6 +119,4 @@ dre_map = {
     "52-ENTRADA DE MERCADORIA EM BONIFICACAO": "Neutro",
     "57-ENTRADA MERCADORIA CONTA ORDEM TERCEIROS": "Neutro",
     "327-DEVOLUCAO SIMB. RECEB. EM CONSIG.": "Neutro",
-
 }
-
