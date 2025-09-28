@@ -279,7 +279,7 @@ if not df.empty:
             num_itens_estoque = len(df_estoque)
             col1, col2 = st.columns(2)
             col1.metric("Itens Únicos em Estoque", f"{num_itens_estoque}")
-            col2.metric("Valor Total do Estoque (Custo)", f"R$ {valor_total_estoque:,.2f}")
+            col2.metric("Valor Total do Estoque (Custo)", f"R$ {valor_total_estoque:.,2f}")
             st.divider()
             
             item_estoque_pesquisado = st.text_input("Pesquisar por item no estoque:", key="pesquisa_estoque")
@@ -370,4 +370,5 @@ else:
     if MODO_ONLINE:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
+
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
