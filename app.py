@@ -246,7 +246,6 @@ if not df.empty:
 
     with tabs[0]: # Dashboard Geral
         tipo_analise = st.radio("Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True)
-        st.divider()
         if tipo_analise == "Vendas":
             df_vendas = df_filtrado[df_filtrado['Movimentação'] == 'Saída']
             st.subheader("Resumo de Vendas")
@@ -424,3 +423,4 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
+
