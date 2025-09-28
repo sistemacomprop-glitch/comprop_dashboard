@@ -40,29 +40,41 @@ def carregar_css():
     <style>
         .stButton>button { background-color: #F37A24; color: white; }
         h1, h2, h3 { color: #004225; }
-        .stMetric { background-color: #F0F2F6; border-radius: 10px; padding: 15px; }
-
-        /* --- NOVAS REGRAS PARA REDUZIR ESPAÇOS --- */
-
-        /* Diminui o espaço vertical entre os blocos de elementos */
-        .st-emotion-cache-z5fcl4 {
-            padding-top: 1rem; /* Reduz o espaço no topo da página */
-            padding-bottom: 1rem;
+        .stMetric { 
+            background-color: #F0F2F6; /* Cor para o modo claro (padrão) */
+            border-radius: 10px; 
+            padding: 15px; 
         }
 
-        /* Reduz as margens dos divisores (as linhas horizontais) */
+        /* --- INÍCIO DA CORREÇÃO PARA MODO ESCURO --- */
+
+        /* Aplica estes estilos apenas quando o tema do dispositivo/navegador for escuro */
+        @media (prefers-color-scheme: dark) {
+            .stMetric {
+                background-color: #333842; /* Um cinza mais escuro para o fundo */
+                color: white;             /* Garante que o texto da métrica seja branco */
+            }
+            /* Opcional: Garante que o texto do rótulo também seja visível */
+            div[data-testid="stMetricLabel"] > div {
+                color: #A5A8B1; /* Um cinza claro para o rótulo */
+            }
+        }
+        /* --- FIM DA CORREÇÃO --- */
+
+
+        /* --- REGRAS PARA REDUZIR ESPAÇOS --- */
+        .st-emotion-cache-z5fcl4 {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
         hr {
             margin-top: 0.25rem;
             margin-bottom: 0.5rem;
         }
-
-        /* Reduz o espaço em torno dos sub-cabeçalhos (como "Resumo de Vendas") */
         h3 {
             margin-top: 0.75rem;
             margin-bottom: 0.25rem;
         }
-
-        /* Reduz o espaço em torno do seletor de rádio (Vendas/Compras) */
         div[data-testid="stRadio"] {
             margin-top: 0rem;
             margin-bottom: 0.25rem;
@@ -414,4 +426,3 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
-
