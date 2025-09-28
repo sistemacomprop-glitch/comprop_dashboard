@@ -253,7 +253,8 @@ if not df.empty:
         st.dataframe(movimentacao_diaria,
             column_config={
                 "Entrada": st.column_config.NumberColumn("Entrada", format="R$ %.2f"),
-                "Saída": st.column_config.NumberColumn("Saída", format="R$ %.2f")
+                "Saída": st.column_config.NumberColumn("Saída", format="R$ %.2f"),
+                "Sem Movimentação": st.column_config.NumberColumn("Sem Movimentação", format="R$ %.2f")
             }
         )
 
