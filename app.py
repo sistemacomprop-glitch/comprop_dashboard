@@ -41,6 +41,32 @@ def carregar_css():
         .stButton>button { background-color: #F37A24; color: white; }
         h1, h2, h3 { color: #004225; }
         .stMetric { background-color: #F0F2F6; border-radius: 10px; padding: 15px; }
+
+        /* --- NOVAS REGRAS PARA REDUZIR ESPAÇOS --- */
+
+        /* Diminui o espaço vertical entre os blocos de elementos */
+        .st-emotion-cache-z5fcl4 {
+            padding-top: 1rem; /* Reduz o espaço no topo da página */
+            padding-bottom: 1rem;
+        }
+
+        /* Reduz as margens dos divisores (as linhas horizontais) */
+        hr {
+            margin-top: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Reduz o espaço em torno dos sub-cabeçalhos (como "Resumo de Vendas") */
+        h3 {
+            margin-top: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Reduz o espaço em torno do seletor de rádio (Vendas/Compras) */
+        div[data-testid="stRadio"] {
+            margin-top: 0rem;
+            margin-bottom: 0.25rem;
+        }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
