@@ -250,7 +250,12 @@ if not df.empty:
         st.header("Comparativo de Entradas vs. Saídas")
         movimentacao_diaria = df_filtrado.groupby([df_filtrado['Data Emissão'].dt.date, 'Movimentação'])['Total do Item'].sum().unstack(fill_value=0)
         st.bar_chart(movimentacao_diaria)
-        st.dataframe(movimentacao_diaria)
+        st.dataframe(movimentacao_diaria,
+            column_config={
+                "Entrada": st.column_config.NumberColumn("Entrada", format="R$ %.2f"),
+                "Saída": st.column_config.NumberColumn("Saída", format="R$ %.2f")
+            }
+        )
 
     with tabs[2]: # Ranking de Produtos
         st.header("Ranking de Produtos Mais Vendidos")
