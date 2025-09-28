@@ -293,6 +293,7 @@ if not df.empty:
                 "Preço de Venda": st.column_config.NumberColumn(format="R$ %.2f"),
                 "Preço de Custo": st.column_config.NumberColumn(format="R$ %.2f"),
                 "Custo Total": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Total da Nota": st.column_config.NumberColumn(format="R$ %.2f"),
             }
         )
     
