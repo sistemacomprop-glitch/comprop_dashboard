@@ -77,9 +77,9 @@ if __name__ == "__main__":
             data_inicial_rpa_str = data_inicio_extracao.strftime('%d%m%y')
             data_final_rpa_str = data_fim_extracao.strftime('%d%m%y')
 
-            sucesso_rpa = executar_rpa_extracao(PASTA_RAIZ_RELATORIOS, data_inicial_rpa_str, data_final_rpa_str)
-            if not sucesso_rpa:
-                raise RuntimeError("A automação (RPA) falhou.")
+           # sucesso_rpa = executar_rpa_extracao(PASTA_RAIZ_RELATORIOS, data_inicial_rpa_str, data_final_rpa_str)
+           # if not sucesso_rpa:
+           #     raise RuntimeError("A automação (RPA) falhou.")
 
             novos_dados_df, df_inventario_novo = executar_processo_de_dados(PASTA_RAIZ_RELATORIOS, PALAVRA_CHAVE_INVENTARIO)
             if novos_dados_df is not None and not novos_dados_df.empty:
