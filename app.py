@@ -12,6 +12,24 @@ from gspread_dataframe import get_as_dataframe
 # Importa as configurações do arquivo central
 from config import CAMINHO_LOGO, CAMINHO_EXCEL_LOCAL, MODO_ONLINE, NOME_PLANILHA_ONLINE
 
+# Adicione esta função no início do seu app.py
+
+def formatar_numero_br(valor):
+    """
+    Formata um número float para o padrão de moeda brasileira (ex: R$ 1.234,56).
+    """
+    # 1. Usa um f-string para formatar o número com vírgulas de milhar e 2 casas decimais (padrão US)
+    # Ex: 1234.56 -> "1,234.56"
+    numero_us = f"{valor:,.2f}"
+    
+    # 2. Inverte os separadores de forma segura
+    #    - Troca ',' por um caractere temporário '#'
+    #    - Troca '.' por ','
+    #    - Troca o caractere temporário '#' por '.'
+    numero_br = numero_us.replace(',', '#').replace('.', ',').replace('#', '.')
+    
+    return f"R$ {numero_br}"
+
 # =================================================================================
 # --- CONFIGURAÇÃO E ESTILO ---
 # =================================================================================
@@ -210,9 +228,9 @@ if not df.empty:
             total_custo_vendas = (df_vendas['Custo Total']).sum()
             lucro_bruto = total_vendas - total_custo_vendas
             col1, col2, col3 = st.columns(3)
-            col1.metric("Vendas Totais", f"R$ {total_vendas:,.2f}")
-            col2.metric("Custo das Vendas", f"R$ {total_custo_vendas:,.2f}")
-            col3.metric("Lucro Bruto", f"R$ {lucro_bruto:,.2f}")
+            col1.metric("Vendas Totais", formatar_numero_br(total_vendas))
+            col2.metric("Custo das Vendas", formatar_numero_br(total_custo_vendas))
+            col3.metric("Lucro Bruto", formatar_numero_br(lucro_bruto))
             st.subheader("Vendas por Cliente")
             vendas_por_cliente = df_vendas.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False)
             st.bar_chart(vendas_por_cliente)
@@ -222,7 +240,7 @@ if not df.empty:
             total_compras = df_compras['Total do Item'].sum()
             num_notas_compra = df_compras['Nota'].nunique()
             col1, col2 = st.columns(2)
-            col1.metric("Total de Compras", f"R$ {total_compras:,.2f}")
+            col1.metric("Total de Compras", formatar_numero_br(total_compras))
             col2.metric("Notas de Compra", f"{num_notas_compra}")
             st.subheader("Maiores Compras (por Fornecedor/Cliente)")
             compras_por_fornecedor = df_compras.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False).nlargest(15)
@@ -279,7 +297,7 @@ if not df.empty:
             num_itens_estoque = len(df_estoque)
             col1, col2 = st.columns(2)
             col1.metric("Itens Únicos em Estoque", f"{num_itens_estoque}")
-            col2.metric("Valor Total do Estoque (Custo)", f"R$ {valor_total_estoque:.,2f}")
+            col2.metric("Valor Total do Estoque (Custo)", formatar_numero_br(valor_total_estoque))
             st.divider()
             
             item_estoque_pesquisado = st.text_input("Pesquisar por item no estoque:", key="pesquisa_estoque")
@@ -317,10 +335,10 @@ if not df.empty:
             # Exibe os KPIs em colunas, como no Dashboard Geral
             st.subheader("Indicadores Principais do Período")
             col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Receita Líquida", f"R$ {receita_liquida:,.2f}")
-            col2.metric("Custos", f"R$ {custos - reducao_custos:,.2f}")
-            col3.metric("Despesas", f"R$ {despesas:,.2f}")
-            col4.metric("Resultado Líquido", f"R$ {resultado_final:,.2f}")
+            col1.metric("Receita Líquida", formatar_numero_br(receita_liquida))
+            col2.metric("Custos", formatar_numero_br(custos - reducao_custos))
+            col3.metric("Despesas", formatar_numero_br(despesas))
+            col4.metric("Resultado Líquido", formatar_numero_br(resultado_final))
             
             st.divider()
 
@@ -350,25 +368,24 @@ if not df.empty:
                 st.subheader("Estrutura do Resultado")
                 dcol1, dcol2 = st.columns([3, 1])
                 dcol1.text("(=) Receita Operacional Bruta")
-                dcol2.metric("", f"R$ {receita:,.2f}")
+                dcol2.metric("", formatar_numero_br(receita))
                 dcol1.text("(-) Deduções da Receita")
-                dcol2.metric("", f"R$ {deducoes:,.2f}")
+                dcol2.metric("", formatar_numero_br(deducoes))
                 dcol1.markdown("**(=) Receita Operacional Líquida**")
-                dcol2.metric("", f"**R$ {receita_liquida:,.2f}**")
+                dcol2.metric("", f"**{formatar_numero_br(receita_liquida)}**")
                 dcol1.text("(-) Custo (Mercadorias e Serviços)")
-                dcol2.metric("", f"R$ {custos - reducao_custos:,.2f}")
+                dcol2.metric("", formatar_numero_br(custos - reducao_custos))
                 dcol1.markdown("**(=) Resultado Bruto (Lucro Bruto)**")
-                dcol2.metric("", f"**R$ {resultado_bruto:,.2f}**")
+                dcol2.metric("", f"**{formatar_numero_br(resultado_bruto)}**")
                 dcol1.text("(-) Despesas Operacionais")
-                dcol2.metric("", f"R$ {despesas:,.2f}")
+                dcol2.metric("", formatar_numero_br(despesas))
                 st.divider()
                 dcol1.markdown("### (=) Resultado Líquido do Período")
-                dcol2.metric("", f"### R$ {resultado_final:,.2f}")
+                dcol2.metric("", f"### {formatar_numero_br(resultado_final)}")
     else:
         st.error("A coluna 'Classificação DRE' não foi encontrada para gerar esta aba.")
 else:
     if MODO_ONLINE:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
-
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
