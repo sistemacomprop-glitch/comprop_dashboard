@@ -7,7 +7,7 @@ PALAVRA_CHAVE_INVENTARIO = 'ppReport1inventario'
 NOME_PLANILHA_ONLINE = "COMPROP_Dashboard_Data"
 CAMINHO_CREDENCIAS_JSON = "credentials.json"
 CAMINHO_EXCEL_LOCAL = r'C:\Users\consultor.ale\Desktop\Mamede\Relatórios\COMPROP_Dashboard_Data_Local.xlsx'
-CAMINHO_LOGO = image_9b00e0.png'
+CAMINHO_LOGO = 'image_9b00e0.png'
 
 # --- Dicionário de Mapeamento de Movimentação ---
 
@@ -121,3 +121,4 @@ dre_map = {
     "327-DEVOLUCAO SIMB. RECEB. EM CONSIG.": "Neutro",
 
 }
+
