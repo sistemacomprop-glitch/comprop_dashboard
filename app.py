@@ -1,18 +1,16 @@
-# app.py - Versão 11.0: Versão Estável Definitiva (Arquivo Único)
+# app.py - Versão 11.0: Versão Estável Definitiva (Estrutura de Arquivo Único)
 
 import streamlit as st
 import pandas as pd
 import os
 from PIL import Image
 from datetime import date
+import gspread
+from gspread_dataframe import get_as_dataframe
+
 
 # Importa as configurações do arquivo central
-from config import CAMINHO_LOGO, CAMINHO_EXCEL_LOCAL
-
-# =================================================================================
-# --- CHAVE SELETORA DE MODO DE OPERAÇÃO ---
-# =================================================================================
-MODO_ONLINE = False 
+from config import CAMINHO_LOGO, CAMINHO_EXCEL_LOCAL, MODO_ONLINE, NOME_PLANILHA_ONLINE
 
 # =================================================================================
 # --- CONFIGURAÇÃO E ESTILO ---
@@ -32,55 +30,72 @@ def carregar_css():
 carregar_css()
 
 # =================================================================================
-# --- FUNÇÕES DE CARREGAMENTO DE DADOS (Agora dentro do app.py) ---
+# --- FUNÇÕES DE CARREGAMENTO DE DADOS (Agora centralizadas aqui) ---
 # =================================================================================
 @st.cache_data(ttl=600)
-def carregar_dados_locais(caminho_arquivo):
-    """Carrega dados das abas 'Movimentacoes' e 'Estoque' de um arquivo Excel."""
-    try:
-        if os.path.exists(caminho_arquivo):
-            dados_excel = pd.read_excel(caminho_arquivo, sheet_name=None)
+def carregar_dados():
+    """
+    Função mestra que carrega os dados do local correto (local ou online)
+    e retorna dois dataframes: movimentações e estoque.
+    """
+    df_mov, df_est = pd.DataFrame(), pd.DataFrame() # Inicia dataframes vazios
+
+    if MODO_ONLINE:
+        try:
+            # Lógica para carregar do Google Sheets
+            creds_dict = st.secrets["gcp_service_account"]
+            gc = gspread.service_account_from_dict(creds_dict)
+            spreadsheet = gc.open(NOME_PLANILHA_ONLINE)
+            mov_sheet = spreadsheet.worksheet('Movimentacoes')
+            est_sheet = spreadsheet.worksheet('Estoque')
+            df_mov = get_as_dataframe(mov_sheet, evaluate_formulas=True)
+            df_est = get_as_dataframe(est_sheet, evaluate_formulas=True)
+        except Exception as e:
+            st.error("Falha ao carregar dados online.")
+            st.exception(e)
             
-            df_mov = dados_excel.get('Movimentacoes', pd.DataFrame())
-            df_est = dados_excel.get('Estoque', pd.DataFrame())
-            
-            # Limpeza do DataFrame de Movimentações
-            if not df_mov.empty:
-                df_mov.columns = df_mov.columns.str.strip()
-                if 'Data Emissão' in df_mov.columns:
-                    df_mov['Data Emissão'] = pd.to_datetime(df_mov['Data Emissão'], format='%d/%m/%Y', errors='coerce')
-                if 'Data de Vencimento' in df_mov.columns:
-                    df_mov['Data de Vencimento'] = pd.to_datetime(df_mov['Data de Vencimento'], format='%d/%m/%Y', errors='coerce')
+    else: # Modo Local
+        try:
+            if os.path.exists(CAMINHO_EXCEL_LOCAL):
+                dados_excel = pd.read_excel(CAMINHO_EXCEL_LOCAL, sheet_name=None)
+                df_mov = dados_excel.get('Movimentacoes', pd.DataFrame())
+                df_est = dados_excel.get('Estoque', pd.DataFrame())
+            else:
+                 st.error(f"Arquivo local não encontrado: {CAMINHO_EXCEL_LOCAL}")
+        except Exception as e:
+            st.error(f"Erro ao carregar o arquivo Excel local: {e}")
 
-            # Limpeza do DataFrame de Estoque
-            if not df_est.empty:
-                df_est.columns = df_est.columns.str.strip()
-                for col in ['Saldo', 'Custo Unit.', 'Custo Total']:
-                     if col in df_est.columns:
-                        df_est[col] = pd.to_numeric(df_est[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+    # --- LIMPEZA DE DADOS CENTRALIZADA ---
+    # Limpeza do DataFrame de Movimentações
+    if not df_mov.empty:
+        df_mov.columns = df_mov.columns.str.strip()
+        if 'Data Emissão' in df_mov.columns:
+            df_mov['Data Emissão'] = pd.to_datetime(df_mov['Data Emissão'], format='%d/%m/%Y', errors='coerce')
+        if 'Data de Vencimento' in df_mov.columns:
+            df_mov['Data de Vencimento'] = pd.to_datetime(df_mov['Data de Vencimento'], format='%d/%m/%Y', errors='coerce')
 
-            return df_mov, df_est
-        else:
-            return pd.DataFrame(), pd.DataFrame()
-    except Exception as e:
-        st.error(f"Erro ao carregar o arquivo Excel local: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+    # Limpeza do DataFrame de Estoque
+    if not df_est.empty:
+        df_est.columns = df_est.columns.str.strip()
+        for col in ['Saldo', 'Custo Unit.', 'Custo Total']:
+             if col in df_est.columns:
+                df_est[col] = pd.to_numeric(df_est[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
 
-# Lógica principal de carregamento de dados
-if MODO_ONLINE:
-    st.sidebar.error("Modo Online desativado.")
-    df_movimentacoes, df_estoque = pd.DataFrame(), pd.DataFrame()
-else:
-    st.sidebar.warning("Modo: Local 💻")
-    df_movimentacoes, df_estoque = carregar_dados_locais(CAMINHO_EXCEL_LOCAL)
+    return df_mov, df_est
 
-df = df_movimentacoes
+# Carrega os dados uma única vez no início do script
+df_movimentacoes, df_estoque = carregar_dados()
+df = df_movimentacoes # Define o df principal para os filtros
 
 # =================================================================================
 # --- BARRA LATERAL (SIDEBAR) ---
 # =================================================================================
 st.sidebar.image(CAMINHO_LOGO)
 st.sidebar.title("Painel de Controle")
+if MODO_ONLINE:
+    st.sidebar.success("Modo: Online ☁️")
+else:
+    st.sidebar.warning("Modo: Local 💻")
 st.sidebar.divider()
 st.sidebar.header("Filtros de Análise")
 
@@ -154,10 +169,9 @@ if not df.empty:
         "📈 DRE Simplificado"
     ]
     
-    # Verifica se a coluna DRE existe antes de mostrar a aba
     if 'Classificação DRE' not in df.columns:
         st.error("A coluna 'Classificação DRE' não foi encontrada. A aba de DRE não pode ser gerada.")
-        tabs = st.tabs(tab_list[:-1]) # Mostra abas antigas
+        tabs = st.tabs(tab_list[:-1])
     else:
         tabs = st.tabs(tab_list)
 
