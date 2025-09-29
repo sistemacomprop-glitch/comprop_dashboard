@@ -8,6 +8,20 @@ from datetime import date
 import gspread
 from gspread_dataframe import get_as_dataframe
 import io
+import locale
+
+# --- 2. ADICIONE ESTE BLOCO PARA CONFIGURAR A TRADUÇÃO ---
+try:
+    # Tenta configurar a localidade para Português do Brasil (padrão em sistemas Linux/Mac)
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+except locale.Error:
+    try:
+        # Tenta a alternativa comum para sistemas Windows
+        locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+    except locale.Error:
+        # Se ambos falharem, o app continua funcionando com o padrão em inglês.
+        print("Aviso: Não foi possível configurar a localidade para Português do Brasil.")
+# --- FIM DO BLOCO DE TRADUÇÃO ---
 
 # Importa as configurações do arquivo central
 from config import CAMINHO_LOGO, CAMINHO_EXCEL_LOCAL, MODO_ONLINE, NOME_PLANILHA_ONLINE
@@ -449,6 +463,3 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
-
-
-
