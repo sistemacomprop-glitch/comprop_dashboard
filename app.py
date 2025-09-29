@@ -192,7 +192,7 @@ if not df.empty:
     # Verifica se a coluna existe antes de criar o filtro
     if 'Classificação DRE' in df.columns:
         dre_unicas = ['Todas'] + sorted(df['Classificação DRE'].astype(str).unique())
-        dre_selecionado = st.sidebar.selectbox("Filtrar por Classificação DRE", dre_unicas)
+        dre_selecionado = st.sidebar.selectbox("Filtrar por Classificação", dre_unicas)
     else:
         dre_selecionado = 'Todas' # Define um valor padrão se a coluna não existir
 
@@ -449,5 +449,6 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
+
 
 
