@@ -182,13 +182,39 @@ if not df.empty:
     
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, default=st.session_state.clientes_selecionados)
     
+    # --- INÍCIO DA ADIÇÃO DOS NOVOS FILTROS ---
+    
+    # Filtro por Movimentação
+    movimentacoes_unicas = ['Todas'] + sorted(df['Movimentação'].astype(str).unique())
+    movimentacao_selecionada = st.sidebar.selectbox("Filtrar por Movimentação", movimentacoes_unicas)
+    
+    # Filtro por Classificação DRE
+    # Verifica se a coluna existe antes de criar o filtro
+    if 'Classificação DRE' in df.columns:
+        dre_unicas = ['Todas'] + sorted(df['Classificação DRE'].astype(str).unique())
+        dre_selecionado = st.sidebar.selectbox("Filtrar por Classificação DRE", dre_unicas)
+    else:
+        dre_selecionado = 'Todas' # Define um valor padrão se a coluna não existir
+
+    # --- FIM DA ADIÇÃO DOS NOVOS FILTROS ---
+    
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
     nf_pesquisada = st.sidebar.text_input("Pesquisar por Nº da Nota")
     pagamento_pesquisado = st.sidebar.text_input("Pesquisar por Forma de Pagto")
     vendedor_pesquisado = st.sidebar.text_input("Pesquisar por Vendedor")
 
+    # --- LÓGICA DE APLICAÇÃO DOS FILTROS ---
     if clientes_selecionados:
         df_filtrado = df_filtrado[df_filtrado['Cliente'].isin(clientes_selecionados)]
+    
+    # Aplica os novos filtros
+    if movimentacao_selecionada != 'Todas':
+        df_filtrado = df_filtrado[df_filtrado['Movimentação'] == movimentacao_selecionada]
+        
+    if dre_selecionado != 'Todas' and 'Classificação DRE' in df_filtrado.columns:
+        df_filtrado = df_filtrado[df_filtrado['Classificação DRE'] == dre_selecionado]
+
+    # Aplica os filtros de texto
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
     if nf_pesquisada:
@@ -423,6 +449,5 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
-
 
 
