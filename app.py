@@ -1,4 +1,14 @@
-# app.py - Versão com Aba de Transferências Dedicada
+Com certeza\! Ótima sugestão. Separar os valores de entrada e saída na aba de transferências vai dar uma visão muito mais clara do fluxo de stock entre as suas unidades.
+
+Fiz exatamente a alteração que pediu: agora, em vez de um valor total, a aba "Transferências" exibe três métricas principais: o total de operações, o valor total de entradas por transferência e o valor total de saídas por transferência, e removi a palavra "(Custo)" dos títulos.
+
+### **Código `app.py` Atualizado**
+
+**Instruções:**
+Substitua o conteúdo do seu arquivo `app.py` pelo código completo abaixo. A única alteração está na aba "Transferências".
+
+```python
+# app.py - Versão com métricas de transferência separadas
 
 import streamlit as st
 import pandas as pd
@@ -55,12 +65,7 @@ carregar_css()
 # =================================================================================
 @st.cache_data(ttl=600)
 def carregar_dados():
-    """
-    Função mestra que carrega os dados do local correto (local ou online)
-    e retorna dois dataframes: movimentações e estoque.
-    """
-    df_mov, df_est = pd.DataFrame(), pd.DataFrame() # Inicia dataframes vazios
-
+    df_mov, df_est = pd.DataFrame(), pd.DataFrame()
     if MODO_ONLINE:
         try:
             creds_dict = st.secrets["gcp_service_account"]
@@ -73,8 +78,7 @@ def carregar_dados():
         except Exception as e:
             st.error("Falha ao carregar dados online.")
             st.exception(e)
-            
-    else: # Modo Local
+    else:
         try:
             if os.path.exists(CAMINHO_EXCEL_LOCAL):
                 dados_excel = pd.read_excel(CAMINHO_EXCEL_LOCAL, sheet_name=None)
@@ -84,14 +88,12 @@ def carregar_dados():
                  st.error(f"Arquivo local não encontrado: {CAMINHO_EXCEL_LOCAL}")
         except Exception as e:
             st.error(f"Erro ao carregar o arquivo Excel local: {e}")
-
     if not df_mov.empty:
         df_mov.columns = df_mov.columns.str.strip()
         if 'Data Emissão' in df_mov.columns:
             df_mov['Data Emissão'] = pd.to_datetime(df_mov['Data Emissão'], format='%d/%m/%Y', errors='coerce')
         if 'Data de Vencimento' in df_mov.columns:
             df_mov['Data de Vencimento'] = pd.to_datetime(df_mov['Data de Vencimento'], format='%d/%m/%Y', errors='coerce')
-
     if not df_est.empty:
         df_est.columns = df_est.columns.str.strip()
         def clean_and_convert_decimal(series):
@@ -105,10 +107,8 @@ def carregar_dados():
         for col in ['Saldo', 'Custo Unit.', 'Custo Total']:
              if col in df_est.columns:
                 df_est[col] = clean_and_convert_decimal(df_est[col])
-
     return df_mov, df_est
 
-# Carrega os dados uma única vez no início do script
 df_movimentacoes, df_estoque = carregar_dados()
 df = df_movimentacoes
 
@@ -123,7 +123,6 @@ df_filtrado = df.copy() if not df.empty else pd.DataFrame()
 if not df.empty:
     ativar_filtro_data = st.sidebar.checkbox("Filtrar por Período", value=False)
     datas_validas = df['Data Emissão'].dropna()
-
     if ativar_filtro_data and not datas_validas.empty:
         data_min_default = datas_validas.min().date()
         data_max_default = datas_validas.max().date()
@@ -146,7 +145,6 @@ if not df.empty:
         st.rerun()
     
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, default=st.session_state.clientes_selecionados)
-    
     movimentacoes_unicas = ['Todas'] + sorted(df['Movimentação'].astype(str).unique())
     movimentacao_selecionada = st.sidebar.selectbox("Filtrar por Movimentação", movimentacoes_unicas)
     
@@ -198,35 +196,28 @@ else:
 st.title("Dashboard de Análise e Estoque")
 
 if not df.empty:
-    
-    # --- INÍCIO DA MUDANÇA: Separação dos dataframes ---
     df_transferencias = df_filtrado[df_filtrado['Tipo de Operação'].str.contains("TRANSFERENCIA", case=False, na=False)]
     df_operacional = df_filtrado[~df_filtrado['Tipo de Operação'].str.contains("TRANSFERENCIA", case=False, na=False)]
-    # --- FIM DA MUDANÇA ---
     
     st.info(f"Exibindo **{len(df_operacional):,}** registros operacionais e **{len(df_transferencias):,}** em transferências.")
     st.divider()
 
-    # --- INÍCIO DA MUDANÇA: Adição da nova aba na lista ---
     tab_list = [
         "📊 Dashboard Geral", 
         "📈 DRE Simplificado",
-        "🚚 Transferências", # <-- NOVA ABA
+        "🚚 Transferências",
         "📈 Entradas vs. Saídas", 
         "🏆 Ranking de Produtos", 
         "👑 Ranking Vendedores", 
         "📋 Consulta Detalhada", 
         "📦 Estoque Atual"
     ]
-    # --- FIM DA MUDANÇA ---
     
     if 'Classificação DRE' not in df.columns:
         st.error("A coluna 'Classificação DRE' não foi encontrada. A aba de DRE não pode ser gerada.")
-        tab_list.pop(1) 
+        tab_list.pop(1)
     
     tabs = st.tabs(tab_list)
-
-    # --- IMPORTANTE: Todas as abas a partir de agora usarão 'df_operacional' ---
 
     with tabs[0]: # Dashboard Geral
         tipo_analise = st.radio("Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True)
@@ -298,18 +289,27 @@ if not df.empty:
                 st.divider()
                 dcol1.markdown("### (=) Resultado Líquido do Período"); dcol2.metric("", f"### {formatar_numero_br(resultado_final)}")
 
-    # --- INÍCIO DA MUDANÇA: Conteúdo da nova aba de Transferências ---
+    # --- INÍCIO DA MUDANÇA: Conteúdo da aba de Transferências ---
     with tabs[2]:
         st.header("Consulta de Transferências")
         st.write("Esta aba exibe apenas as movimentações de transferência de estoque, que não impactam o DRE.")
 
         if not df_transferencias.empty:
-            total_transferido = df_transferencias['Total do Item'].sum()
             num_operacoes = len(df_transferencias)
             
-            col1, col2 = st.columns(2)
+            # Separa os dataframes de entrada e saída
+            df_transf_entradas = df_transferencias[df_transferencias['Movimentação'] == 'Entrada']
+            df_transf_saidas = df_transferencias[df_transferencias['Movimentação'] == 'Saída']
+
+            # Calcula os totais
+            total_entradas = df_transf_entradas['Total do Item'].sum()
+            total_saidas = df_transf_saidas['Total do Item'].sum()
+            
+            # Cria 3 colunas para as métricas
+            col1, col2, col3 = st.columns(3)
             col1.metric("Operações de Transferência", f"{num_operacoes}")
-            col2.metric("Valor Total Transferido (Custo)", formatar_numero_br(total_transferido))
+            col2.metric("Valor Total de Entradas", formatar_numero_br(total_entradas))
+            col3.metric("Valor Total de Saídas", formatar_numero_br(total_saidas))
             
             st.dataframe(df_transferencias, width='stretch',
                 column_config={
@@ -396,3 +396,4 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
+```
