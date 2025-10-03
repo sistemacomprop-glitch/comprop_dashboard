@@ -1,4 +1,4 @@
-# app.py - Versão 11.0: Versão Estável Definitiva (Estrutura de Arquivo Único)
+# app.py - Versão com Aba de Transferências Dedicada
 
 import streamlit as st
 import pandas as pd
@@ -12,22 +12,12 @@ import io
 # Importa as configurações do arquivo central
 from config import CAMINHO_LOGO, CAMINHO_EXCEL_LOCAL, MODO_ONLINE, NOME_PLANILHA_ONLINE
 
-# Adicione esta função no início do seu app.py
-
 def formatar_numero_br(valor):
     """
     Formata um número float para o padrão de moeda brasileira (ex: R$ 1.234,56).
     """
-    # 1. Usa um f-string para formatar o número com vírgulas de milhar e 2 casas decimais (padrão US)
-    # Ex: 1234.56 -> "1,234.56"
     numero_us = f"{valor:,.2f}"
-    
-    # 2. Inverte os separadores de forma segura
-    #    - Troca ',' por um caractere temporário '#'
-    #    - Troca '.' por ','
-    #    - Troca o caractere temporário '#' por '.'
     numero_br = numero_us.replace(',', '#').replace('.', ',').replace('#', '.')
-    
     return f"R$ {numero_br}"
 
 # =================================================================================
@@ -45,14 +35,11 @@ def carregar_css():
             border-radius: 10px; 
             padding: 15px; 
         }
-
-        /* Aplica estes estilos apenas quando o tema do dispositivo/navegador for escuro */
         @media (prefers-color-scheme: dark) {
             .stMetric {
                 background-color: #333842; /* Um cinza mais escuro para o fundo */
                 color: white;             /* Garante que o texto da métrica seja branco */
             }
-            /* Opcional: Garante que o texto do rótulo também seja visível */
             div[data-testid="stMetricLabel"] > div {
                 color: #A5A8B1; /* Um cinza claro para o rótulo */
             }
@@ -76,7 +63,6 @@ def carregar_dados():
 
     if MODO_ONLINE:
         try:
-            # Lógica para carregar do Google Sheets
             creds_dict = st.secrets["gcp_service_account"]
             gc = gspread.service_account_from_dict(creds_dict)
             spreadsheet = gc.open(NOME_PLANILHA_ONLINE)
@@ -99,8 +85,6 @@ def carregar_dados():
         except Exception as e:
             st.error(f"Erro ao carregar o arquivo Excel local: {e}")
 
-    # --- LIMPEZA DE DADOS CENTRALIZADA ---
-    # Limpeza do DataFrame de Movimentações
     if not df_mov.empty:
         df_mov.columns = df_mov.columns.str.strip()
         if 'Data Emissão' in df_mov.columns:
@@ -108,32 +92,16 @@ def carregar_dados():
         if 'Data de Vencimento' in df_mov.columns:
             df_mov['Data de Vencimento'] = pd.to_datetime(df_mov['Data de Vencimento'], format='%d/%m/%Y', errors='coerce')
 
-    # Limpeza do DataFrame de Estoque com lógica de conversão robusta
     if not df_est.empty:
         df_est.columns = df_est.columns.str.strip()
-        
-        # Função auxiliar para limpar e converter os números de forma segura
         def clean_and_convert_decimal(series):
-            # 1. Garante que tudo é string e troca vírgula por ponto para padronizar o decimal
             temp_series = series.astype(str).str.replace(',', '.', regex=False)
-
-            # 2. Função interna para remover os pontos de milhar, preservando o último ponto (decimal)
             def remove_thousands_separator(value):
-                # Ignora valores nulos ou inválidos
-                if pd.isna(value) or value is None:
-                    return None
+                if pd.isna(value) or value is None: return None
                 parts = str(value).split('.')
-                # Se o número tiver múltiplos pontos (ex: 1.234.56), junta a parte inteira
-                if len(parts) > 1:
-                    return "".join(parts[:-1]) + "." + parts[-1]
-                # Se não tiver ponto ou tiver apenas um, retorna como está
-                return value
-
-            # 3. Aplica a limpeza e converte para o formato numérico final
+                return "".join(parts[:-1]) + "." + parts[-1] if len(parts) > 1 else value
             cleaned_series = temp_series.apply(remove_thousands_separator)
             return pd.to_numeric(cleaned_series, errors='coerce').fillna(0)
-
-        # Aplica a função de limpeza nas colunas numéricas do estoque
         for col in ['Saldo', 'Custo Unit.', 'Custo Total']:
              if col in df_est.columns:
                 df_est[col] = clean_and_convert_decimal(df_est[col])
@@ -142,7 +110,7 @@ def carregar_dados():
 
 # Carrega os dados uma única vez no início do script
 df_movimentacoes, df_estoque = carregar_dados()
-df = df_movimentacoes # Define o df principal para os filtros
+df = df_movimentacoes
 
 # =================================================================================
 # --- BARRA LATERAL (SIDEBAR) ---
@@ -153,9 +121,7 @@ st.sidebar.title("Painel de Controle")
 df_filtrado = df.copy() if not df.empty else pd.DataFrame()
 
 if not df.empty:
-    # Filtro de data fixo e estável por Data de Emissão
     ativar_filtro_data = st.sidebar.checkbox("Filtrar por Período", value=False)
-    
     datas_validas = df['Data Emissão'].dropna()
 
     if ativar_filtro_data and not datas_validas.empty:
@@ -167,7 +133,6 @@ if not df.empty:
     elif ativar_filtro_data and datas_validas.empty:
         st.sidebar.warning("Nenhuma data válida encontrada para filtrar.")
 
-    # Filtros restantes
     clientes_unicos = sorted(df['Cliente'].astype(str).unique())
     if 'clientes_selecionados' not in st.session_state:
         st.session_state.clientes_selecionados = clientes_unicos
@@ -182,39 +147,26 @@ if not df.empty:
     
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, default=st.session_state.clientes_selecionados)
     
-    # --- INÍCIO DA ADIÇÃO DOS NOVOS FILTROS ---
-    
-    # Filtro por Movimentação
     movimentacoes_unicas = ['Todas'] + sorted(df['Movimentação'].astype(str).unique())
     movimentacao_selecionada = st.sidebar.selectbox("Filtrar por Movimentação", movimentacoes_unicas)
     
-    # Filtro por Classificação DRE
-    # Verifica se a coluna existe antes de criar o filtro
     if 'Classificação DRE' in df.columns:
         dre_unicas = ['Todas'] + sorted(df['Classificação DRE'].astype(str).unique())
         dre_selecionado = st.sidebar.selectbox("Filtrar por Classificação", dre_unicas)
     else:
-        dre_selecionado = 'Todas' # Define um valor padrão se a coluna não existir
-
-    # --- FIM DA ADIÇÃO DOS NOVOS FILTROS ---
+        dre_selecionado = 'Todas'
     
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
     nf_pesquisada = st.sidebar.text_input("Pesquisar por Nº da Nota")
     pagamento_pesquisado = st.sidebar.text_input("Pesquisar por Forma de Pagto")
     vendedor_pesquisado = st.sidebar.text_input("Pesquisar por Vendedor")
 
-    # --- LÓGICA DE APLICAÇÃO DOS FILTROS ---
     if clientes_selecionados:
         df_filtrado = df_filtrado[df_filtrado['Cliente'].isin(clientes_selecionados)]
-    
-    # Aplica os novos filtros
     if movimentacao_selecionada != 'Todas':
         df_filtrado = df_filtrado[df_filtrado['Movimentação'] == movimentacao_selecionada]
-        
     if dre_selecionado != 'Todas' and 'Classificação DRE' in df_filtrado.columns:
         df_filtrado = df_filtrado[df_filtrado['Classificação DRE'] == dre_selecionado]
-
-    # Aplica os filtros de texto
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
     if nf_pesquisada:
@@ -226,7 +178,6 @@ if not df.empty:
         
     st.sidebar.divider()
     st.sidebar.header("Download de Dados")
-    # --- BLOCO PARA GERAR XLSX ---
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_filtrado.to_excel(writer, index=False, sheet_name='Dados')
@@ -247,33 +198,40 @@ else:
 st.title("Dashboard de Análise e Estoque")
 
 if not df.empty:
-    st.info(f"Exibindo **{len(df_filtrado):,}** de **{len(df):,}** registros totais (movimentações).")
+    
+    # --- INÍCIO DA MUDANÇA: Separação dos dataframes ---
+    df_transferencias = df_filtrado[df_filtrado['Tipo de Operação'].str.contains("TRANSFERENCIA", case=False, na=False)]
+    df_operacional = df_filtrado[~df_filtrado['Tipo de Operação'].str.contains("TRANSFERENCIA", case=False, na=False)]
+    # --- FIM DA MUDANÇA ---
+    
+    st.info(f"Exibindo **{len(df_operacional):,}** registros operacionais e **{len(df_transferencias):,}** em transferências.")
     st.divider()
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Reordenando a lista de abas para dar destaque ao DRE
+    # --- INÍCIO DA MUDANÇA: Adição da nova aba na lista ---
     tab_list = [
         "📊 Dashboard Geral", 
         "📈 DRE Simplificado",
+        "🚚 Transferências", # <-- NOVA ABA
         "📈 Entradas vs. Saídas", 
         "🏆 Ranking de Produtos", 
         "👑 Ranking Vendedores", 
         "📋 Consulta Detalhada", 
         "📦 Estoque Atual"
     ]
-    # --- FIM DA CORREÇÃO ---
+    # --- FIM DA MUDANÇA ---
     
     if 'Classificação DRE' not in df.columns:
         st.error("A coluna 'Classificação DRE' não foi encontrada. A aba de DRE não pode ser gerada.")
-        # Remove a aba DRE da lista se a coluna não existir
         tab_list.pop(1) 
     
     tabs = st.tabs(tab_list)
 
+    # --- IMPORTANTE: Todas as abas a partir de agora usarão 'df_operacional' ---
+
     with tabs[0]: # Dashboard Geral
         tipo_analise = st.radio("Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True)
         if tipo_analise == "Vendas":
-            df_vendas = df_filtrado[df_filtrado['Movimentação'] == 'Saída']
+            df_vendas = df_operacional[df_operacional['Movimentação'] == 'Saída']
             st.subheader("Resumo de Vendas")
             total_vendas = df_vendas['Total do Item'].sum()
             total_custo_vendas = (df_vendas['Custo Total']).sum()
@@ -286,7 +244,7 @@ if not df.empty:
             vendas_por_cliente = df_vendas.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False)
             st.bar_chart(vendas_por_cliente)
         elif tipo_analise == "Compras":
-            df_compras = df_filtrado[df_filtrado['Movimentação'] == 'Entrada']
+            df_compras = df_operacional[df_operacional['Movimentação'] == 'Entrada']
             st.subheader("Resumo de Compras")
             total_compras = df_compras['Total do Item'].sum()
             num_notas_compra = df_compras['Nota'].nunique()
@@ -296,131 +254,122 @@ if not df.empty:
             st.subheader("Maiores Compras (por Fornecedor/Cliente)")
             compras_por_fornecedor = df_compras.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False).nlargest(15)
             st.bar_chart(compras_por_fornecedor)
-
-    # A lógica de exibição das abas agora segue a nova ordem
-    # A aba DRE será a segunda (índice 1)
     
-    if 'Classificação DRE' in df_filtrado.columns:
+    if 'Classificação DRE' in df_operacional.columns:
         with tabs[1]: # DRE Simplificado
             st.header("Demonstração do Resultado (DRE Simplificado)")
             st.write("Análise financeira baseada na classificação DRE para o período filtrado.")
-            
-            # Calcula os totais para cada categoria do DRE
-            dre_summary = df_filtrado.groupby('Classificação DRE')['Total do Item'].sum()
-
+            dre_summary = df_operacional.groupby('Classificação DRE')['Total do Item'].sum()
             receita = dre_summary.get('Receita', 0)
             deducoes = dre_summary.get('Dedução de Receita', 0)
             custos = dre_summary.get('Custo', 0)
             reducao_custos = dre_summary.get('Redução de Custo', 0)
             despesas = dre_summary.get('Despesa', 0)
-            
             receita_liquida = receita - deducoes
             resultado_bruto = receita_liquida - (custos - reducao_custos)
             resultado_final = resultado_bruto - despesas
-
-            # Exibe os KPIs em colunas, como no Dashboard Geral
             st.subheader("Indicadores Principais do Período")
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("Receita Líquida", formatar_numero_br(receita_liquida))
             col2.metric("Custos", formatar_numero_br(custos - reducao_custos))
             col3.metric("Despesas", formatar_numero_br(despesas))
             col4.metric("Resultado Líquido", formatar_numero_br(resultado_final))
-            
             st.divider()
-
-            # Exibe os gráficos de composição
             col_graf1, col_graf2 = st.columns(2)
-            
             with col_graf1:
                 st.subheader("Maiores Fontes de Receita")
-                df_receitas = df_filtrado[df_filtrado['Classificação DRE'] == 'Receita']
+                df_receitas = df_operacional[df_operacional['Classificação DRE'] == 'Receita']
                 if not df_receitas.empty:
-                    receitas_por_operacao = df_receitas.groupby('Tipo de Operação')['Total do Item'].sum().nlargest(10)
-                    st.bar_chart(receitas_por_operacao)
-                else:
-                    st.info("Nenhuma receita registrada no período filtrado.")
-
+                    st.bar_chart(df_receitas.groupby('Tipo de Operação')['Total do Item'].sum().nlargest(10))
             with col_graf2:
                 st.subheader("Maiores Despesas")
-                df_despesas = df_filtrado[df_filtrado['Classificação DRE'] == 'Despesa']
+                df_despesas = df_operacional[df_operacional['Classificação DRE'] == 'Despesa']
                 if not df_despesas.empty:
-                    despesas_por_operacao = df_despesas.groupby('Tipo de Operação')['Total do Item'].sum().nlargest(10)
-                    st.bar_chart(despesas_por_operacao)
-                else:
-                    st.info("Nenhuma despesa registrada no período filtrado.")
-
-            # Expander para a visualização detalhada em texto
+                    st.bar_chart(df_despesas.groupby('Tipo de Operação')['Total do Item'].sum().nlargest(10))
             with st.expander("Ver DRE Detalhado (Formato de Lista)"):
                 st.subheader("Estrutura do Resultado")
                 dcol1, dcol2 = st.columns([3, 1])
-                dcol1.text("(=) Receita Operacional Bruta")
-                dcol2.metric("", formatar_numero_br(receita))
-                dcol1.text("(-) Deduções da Receita")
-                dcol2.metric("", formatar_numero_br(deducoes))
-                dcol1.markdown("**(=) Receita Operacional Líquida**")
-                dcol2.metric("", f"**{formatar_numero_br(receita_liquida)}**")
-                dcol1.text("(-) Custo (Mercadorias e Serviços)")
-                dcol2.metric("", formatar_numero_br(custos - reducao_custos))
-                dcol1.markdown("**(=) Resultado Bruto (Lucro Bruto)**")
-                dcol2.metric("", f"**{formatar_numero_br(resultado_bruto)}**")
-                dcol1.text("(-) Despesas Operacionais")
-                dcol2.metric("", formatar_numero_br(despesas))
+                dcol1.text("(=) Receita Operacional Bruta"); dcol2.metric("", formatar_numero_br(receita))
+                dcol1.text("(-) Deduções da Receita"); dcol2.metric("", formatar_numero_br(deducoes))
+                dcol1.markdown("**(=) Receita Operacional Líquida**"); dcol2.metric("", f"**{formatar_numero_br(receita_liquida)}**")
+                dcol1.text("(-) Custo (Mercadorias e Serviços)"); dcol2.metric("", formatar_numero_br(custos - reducao_custos))
+                dcol1.markdown("**(=) Resultado Bruto (Lucro Bruto)**"); dcol2.metric("", f"**{formatar_numero_br(resultado_bruto)}**")
+                dcol1.text("(-) Despesas Operacionais"); dcol2.metric("", formatar_numero_br(despesas))
                 st.divider()
-                dcol1.markdown("### (=) Resultado Líquido do Período")
-                dcol2.metric("", f"### {formatar_numero_br(resultado_final)}")
+                dcol1.markdown("### (=) Resultado Líquido do Período"); dcol2.metric("", f"### {formatar_numero_br(resultado_final)}")
 
-    with tabs[2]: # Entradas vs. Saídas
-        st.header("Comparativo de Entradas vs. Saídas")
-        movimentacao_diaria = df_filtrado.groupby([df_filtrado['Data Emissão'].dt.date, 'Movimentação'])['Total do Item'].sum().unstack(fill_value=0)
+    # --- INÍCIO DA MUDANÇA: Conteúdo da nova aba de Transferências ---
+    with tabs[2]:
+        st.header("Consulta de Transferências")
+        st.write("Esta aba exibe apenas as movimentações de transferência de estoque, que não impactam o DRE.")
+
+        if not df_transferencias.empty:
+            total_transferido = df_transferencias['Total do Item'].sum()
+            num_operacoes = len(df_transferencias)
+            
+            col1, col2 = st.columns(2)
+            col1.metric("Operações de Transferência", f"{num_operacoes}")
+            col2.metric("Valor Total Transferido (Custo)", formatar_numero_br(total_transferido))
+            
+            st.dataframe(df_transferencias, width='stretch',
+                column_config={
+                    "Data Emissão": st.column_config.DateColumn("Data de Emissão", format="DD/MM/YYYY"),
+                    "Total do Item": st.column_config.NumberColumn(format="R$ %.2f"),
+                    "Custo Total": st.column_config.NumberColumn(format="R$ %.2f"),
+                }
+            )
+        else:
+            st.info("Nenhuma operação de transferência encontrada para os filtros selecionados.")
+    # --- FIM DA MUDANÇA ---
+    
+    with tabs[3]: # Entradas vs. Saídas
+        st.header("Comparativo de Entradas vs. Saídas (Operacional)")
+        movimentacao_diaria = df_operacional.groupby([df_operacional['Data Emissão'].dt.date, 'Movimentação'])['Total do Item'].sum().unstack(fill_value=0)
         st.bar_chart(movimentacao_diaria)
         st.dataframe(movimentacao_diaria,
-            column_config={
-                "Entrada": st.column_config.NumberColumn("Entrada", format="R$ %.2f"),
-                "Saída": st.column_config.NumberColumn("Saída", format="R$ %.2f"),
-                "Sem Movimentação": st.column_config.NumberColumn("Sem Movimentação", format="R$ %.2f")
-            }
+            column_config={"Entrada": "R$ %.2f", "Saída": "R$ %.2f", "Sem Movimentação": "R$ %.2f"}
         )
 
-    with tabs[3]: # Ranking de Produtos
+    with tabs[4]: # Ranking de Produtos
         st.header("Ranking de Produtos Mais Vendidos")
-        ranking_produtos = df_filtrado[df_filtrado['Movimentação'] == 'Saída'].groupby('Item Descrição').agg(
+        ranking_produtos = df_operacional[df_operacional['Movimentação'] == 'Saída'].groupby('Item Descrição').agg(
             Quantidade_Vendida=('Quantidade', 'sum'),
             Valor_Total_Vendido=('Total do Item', 'sum')
         ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
         st.dataframe(ranking_produtos, width='stretch',
-            column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
+            column_config={"Valor_Total_Vendido": "R$ %.2f"}
         )
 
-    with tabs[4]: # Ranking Vendedores
+    with tabs[5]: # Ranking Vendedores
         st.header("Ranking de Vendas por Vendedor (Representante)")
-        df_vendedores = df_filtrado[(df_filtrado['Movimentação'] == 'Saída') & (df_filtrado['Representante'] != 'N/A')]
+        df_vendedores = df_operacional[(df_operacional['Movimentação'] == 'Saída') & (df_operacional['Representante'] != 'N/A')]
         if not df_vendedores.empty:
             ranking_vendedores = df_vendedores.groupby('Representante').agg(
                 Valor_Total_Vendido=('Total do Item', 'sum'),
                 Quantidade_de_Vendas=('Nota', 'nunique')
             ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
             st.dataframe(ranking_vendedores, width='stretch',
-                column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
+                column_config={"Valor_Total_Vendido": "R$ %.2f"}
             )
         else:
-            st.info("Não há dados de vendas por representante para o período e filtros selecionados.")
+            st.info("Não há dados de vendas por representante para o período selecionado.")
 
-    with tabs[5]: # Consulta Detalhada
-        st.header("Consulta Detalhada das Movimentações")
-        st.dataframe(df_filtrado, width='stretch',
+    with tabs[6]: # Consulta Detalhada
+        st.header("Consulta Detalhada das Movimentações (Operacional)")
+        st.dataframe(df_operacional, width='stretch',
             column_config={
-                "Data Emissão": st.column_config.DateColumn("Data de Emissão", format="DD/MM/YYYY"),
-                "Data de Vencimento": st.column_config.DateColumn("Data de Vencimento", format="DD/MM/YYYY"),
-                "Valor Unitário": st.column_config.NumberColumn(format="R$ %.2f"),
-                "Total do Item": st.column_config.NumberColumn(format="R$ %.2f"),
-                "Preço de Venda": st.column_config.NumberColumn(format="R$ %.2f"),
-                "Preço de Custo": st.column_config.NumberColumn(format="R$ %.2f"),
-                "Custo Total": st.column_config.NumberColumn(format="R$ %.2f"),
-                "Total da Nota": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Data Emissão": st.column_config.DateColumn(format="DD/MM/YYYY"),
+                "Data de Vencimento": st.column_config.DateColumn(format="DD/MM/YYYY"),
+                "Valor Unitário": "R$ %.2f",
+                "Total do Item": "R$ %.2f",
+                "Preço de Venda": "R$ %.2f",
+                "Preço de Custo": "R$ %.2f",
+                "Custo Total": "R$ %.2f",
+                "Total da Nota": "R$ %.2f",
             }
         )
     
-    with tabs[6]: # Estoque Atual
+    with tabs[7]: # Estoque Atual
         st.header("Consulta de Estoque de Inventário")
         if not df_estoque.empty:
             valor_total_estoque = df_estoque['Custo Total'].sum()
@@ -429,12 +378,10 @@ if not df.empty:
             col1.metric("Itens Únicos em Estoque", f"{num_itens_estoque}")
             col2.metric("Valor Total do Estoque (Custo)", formatar_numero_br(valor_total_estoque))
             st.divider()
-            
             item_estoque_pesquisado = st.text_input("Pesquisar por item no estoque:", key="pesquisa_estoque")
             df_estoque_filtrado = df_estoque
             if item_estoque_pesquisado:
                 df_estoque_filtrado = df_estoque[df_estoque['Descrição'].str.contains(item_estoque_pesquisado, case=False, na=False)]
-            
             st.dataframe(df_estoque_filtrado, width='stretch',
                 column_config={
                     "Custo Unit": st.column_config.NumberColumn("Custo Unit", format="R$ %.2f"),
