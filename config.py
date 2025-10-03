@@ -7,7 +7,7 @@ PALAVRA_CHAVE_INVENTARIO = 'ppReport1inventario'
 NOME_PLANILHA_ONLINE = "COMPROP_Dashboard_Data"
 CAMINHO_CREDENCIAS_JSON = "credentials.json"
 CAMINHO_EXCEL_LOCAL = r'C:\Users\consultor.ale\Desktop\Mamede\Relatórios\COMPROP_Dashboard_Data_Local.xlsx'
-CAMINHO_LOGO = 'image_9b00e0.png'
+CAMINHO_LOGO = r'C:\Users\consultor.ale\Desktop\Mamede\image_9b00e0.png'
 
 # --- Dicionário de Mapeamento de Movimentação ---
 
@@ -88,15 +88,15 @@ dre_map = {
     "320-REMESSA DE MERC. ENT. FUT - NAO COOPERADO": "Receita",
 
     # --- DEDUÇÕES DE RECEITA ---
-    "2-DEVOLUCAO DE VENDA NF PROPRIA": "Dedução de Receita",
-    "3-DEVOLUCAO DE VENDA NF TERCEIROS": "Dedução de Receita",
-    "6-DEVOLUCAO REMESSA DE ENTREGA FUTURA": "Dedução de Receita",
+    "2-DEVOLUCAO DE VENDA NF PROPRIA": "Despesa",
+    "3-DEVOLUCAO DE VENDA NF TERCEIROS": "Despesa",
+    "6-DEVOLUCAO REMESSA DE ENTREGA FUTURA": "Despesa",
 
     # --- CUSTOS ---
-    "321-COMPRA PARA COMERCIALIZACAO": "Custo",
-    "314-COMPRA DE LEITE": "Custo",
-    "16-COMPLEMENTO DE PRECO DE COMPRA": "Custo",
-    "19-DEVOLUCAO DE COMPRA": "Redução de Custo",
+    "321-COMPRA PARA COMERCIALIZACAO": "Despesa",
+    "314-COMPRA DE LEITE": "Despesa",
+    "16-COMPLEMENTO DE PRECO DE COMPRA": "Despesa",
+    "19-DEVOLUCAO DE COMPRA": "Receita",
 
     # --- DESPESAS ---
     "28-COMPRA DE MATERIAL USO E CONSUMO": "Despesa",
@@ -119,5 +119,4 @@ dre_map = {
     "52-ENTRADA DE MERCADORIA EM BONIFICACAO": "Neutro",
     "57-ENTRADA MERCADORIA CONTA ORDEM TERCEIROS": "Neutro",
     "327-DEVOLUCAO SIMB. RECEB. EM CONSIG.": "Neutro",
-
 }
