@@ -1,4 +1,14 @@
-# app.py - Versão com métricas de transferência separadas
+Com certeza\! Adicionar um filtro por "Tipo de Operação" é uma excelente forma de refinar ainda mais a análise, permitindo focar em operações muito específicas.
+
+Implementei o novo filtro no formato `selectbox`, exatamente como o de "Movimentação", e posicionei-o na barra lateral, logo abaixo do filtro de "Classificação DRE".
+
+### **Código `app.py` Atualizado com o Novo Filtro**
+
+**Instruções:**
+Pode substituir todo o conteúdo do seu arquivo `app.py` pelo código completo abaixo. As alterações estão documentadas com comentários na secção da barra lateral para que possa ver exatamente o que foi adicionado.
+
+```python
+# app.py - Versão com filtro de Tipo de Operação
 
 import streamlit as st
 import pandas as pd
@@ -135,15 +145,24 @@ if not df.empty:
         st.rerun()
     
     clientes_selecionados = st.sidebar.multiselect("Clientes", clientes_unicos, default=st.session_state.clientes_selecionados)
+    
     movimentacoes_unicas = ['Todas'] + sorted(df['Movimentação'].astype(str).unique())
     movimentacao_selecionada = st.sidebar.selectbox("Filtrar por Movimentação", movimentacoes_unicas)
     
     if 'Classificação DRE' in df.columns:
         dre_unicas = ['Todas'] + sorted(df['Classificação DRE'].astype(str).unique())
-        dre_selecionado = st.sidebar.selectbox("Filtrar por Classificação", dre_unicas)
+        dre_selecionado = st.sidebar.selectbox("Filtrar por Classificação DRE", dre_unicas)
     else:
         dre_selecionado = 'Todas'
-    
+
+    # --- INÍCIO DA MUDANÇA: Adição do novo filtro ---
+    if 'Tipo de Operação' in df.columns:
+        tipo_operacao_unicas = ['Todas'] + sorted(df['Tipo de Operação'].astype(str).unique())
+        tipo_operacao_selecionada = st.sidebar.selectbox("Filtrar por Tipo de Operação", tipo_operacao_unicas)
+    else:
+        tipo_operacao_selecionada = 'Todas'
+    # --- FIM DA MUDANÇA ---
+
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
     nf_pesquisada = st.sidebar.text_input("Pesquisar por Nº da Nota")
     pagamento_pesquisado = st.sidebar.text_input("Pesquisar por Forma de Pagto")
@@ -155,6 +174,12 @@ if not df.empty:
         df_filtrado = df_filtrado[df_filtrado['Movimentação'] == movimentacao_selecionada]
     if dre_selecionado != 'Todas' and 'Classificação DRE' in df_filtrado.columns:
         df_filtrado = df_filtrado[df_filtrado['Classificação DRE'] == dre_selecionado]
+    
+    # --- INÍCIO DA MUDANÇA: Lógica de aplicação do novo filtro ---
+    if tipo_operacao_selecionada != 'Todas' and 'Tipo de Operação' in df_filtrado.columns:
+        df_filtrado = df_filtrado[df_filtrado['Tipo de Operação'] == tipo_operacao_selecionada]
+    # --- FIM DA MUDANÇA ---
+        
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
     if nf_pesquisada:
@@ -279,28 +304,19 @@ if not df.empty:
                 st.divider()
                 dcol1.markdown("### (=) Resultado Líquido do Período"); dcol2.metric("", f"### {formatar_numero_br(resultado_final)}")
 
-    # --- INÍCIO DA MUDANÇA: Conteúdo da aba de Transferências ---
-    with tabs[2]:
+    with tabs[2]: # Transferências
         st.header("Consulta de Transferências")
         st.write("Esta aba exibe apenas as movimentações de transferência de estoque, que não impactam o DRE.")
-
         if not df_transferencias.empty:
             num_operacoes = len(df_transferencias)
-            
-            # Separa os dataframes de entrada e saída
             df_transf_entradas = df_transferencias[df_transferencias['Movimentação'] == 'Entrada']
             df_transf_saidas = df_transferencias[df_transferencias['Movimentação'] == 'Saída']
-
-            # Calcula os totais
             total_entradas = df_transf_entradas['Total do Item'].sum()
             total_saidas = df_transf_saidas['Total do Item'].sum()
-            
-            # Cria 3 colunas para as métricas
             col1, col2, col3 = st.columns(3)
             col1.metric("Operações de Transferência", f"{num_operacoes}")
             col2.metric("Valor Total de Entradas", formatar_numero_br(total_entradas))
             col3.metric("Valor Total de Saídas", formatar_numero_br(total_saidas))
-            
             st.dataframe(df_transferencias, width='stretch',
                 column_config={
                     "Data Emissão": st.column_config.DateColumn("Data de Emissão", format="DD/MM/YYYY"),
@@ -310,7 +326,6 @@ if not df.empty:
             )
         else:
             st.info("Nenhuma operação de transferência encontrada para os filtros selecionados.")
-    # --- FIM DA MUDANÇA ---
     
     with tabs[3]: # Entradas vs. Saídas
         st.header("Comparativo de Entradas vs. Saídas (Operacional)")
@@ -386,3 +401,5 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
+
+```
