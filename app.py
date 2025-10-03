@@ -34,53 +34,6 @@ def formatar_numero_br(valor):
 # --- CONFIGURAÇÃO E ESTILO ---
 # =================================================================================
 st.set_page_config(page_title="COMPROP | Dashboard", layout="wide")
-def injetar_js_traducao():
-    """
-    Injeta código JavaScript para traduzir o calendário do st.date_input em tempo real
-    no navegador do usuário.
-    """
-    js_code = """
-    <script>
-        const observer = new MutationObserver(function(mutations) {
-            const datepicker = document.querySelector('.stDatepicker');
-            if (datepicker) {
-                // Mapeamento de meses e dias
-                const months = {
-                    'January': 'Janeiro', 'February': 'Fevereiro', 'March': 'Março',
-                    'April': 'Abril', 'May': 'Maio', 'June': 'Junho',
-                    'July': 'Julho', 'August': 'Agosto', 'September': 'Setembro',
-                    'October': 'Outubro', 'November': 'Novembro', 'December': 'Dezembro'
-                };
-                const days = { 'Su': 'Dom', 'Mo': 'Seg', 'Tu': 'Ter', 'We': 'Qua', 'Th': 'Qui', 'Fr': 'Sex', 'Sa': 'Sáb' };
-
-                // Traduz o cabeçalho do mês
-                const monthElement = datepicker.querySelector('.react-datepicker__current-month');
-                if (monthElement) {
-                    for (const [eng, por] of Object.entries(months)) {
-                        if (monthElement.textContent.includes(eng)) {
-                            monthElement.textContent = monthElement.textContent.replace(eng, por);
-                        }
-                    }
-                }
-
-                // Traduz os dias da semana
-                const dayElements = datepicker.querySelectorAll('.react-datepicker__day-name');
-                dayElements.forEach(dayElement => {
-                    for (const [eng, por] of Object.entries(days)) {
-                        if (dayElement.textContent === eng) {
-                            dayElement.textContent = por;
-                        }
-                    }
-                });
-                // Desconecta o observer depois de traduzir para não rodar desnecessariamente
-                // observer.disconnect();
-            }
-        });
-
-        observer.observe(document.body, { childList: true, subtree: true });
-    </script>
-    """
-    st.components.v1.html(js_code, height=0)
 
 def carregar_css():
     css = """
@@ -109,7 +62,6 @@ def carregar_css():
     st.markdown(css, unsafe_allow_html=True)
 
 carregar_css()
-injetar_js_traducao()
 
 # =================================================================================
 # --- FUNÇÕES DE CARREGAMENTO DE DADOS (Agora centralizadas aqui) ---
@@ -497,5 +449,3 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
-
-
