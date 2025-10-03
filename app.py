@@ -1,13 +1,3 @@
-Com certeza\! Adicionar um filtro por "Tipo de Operação" é uma excelente forma de refinar ainda mais a análise, permitindo focar em operações muito específicas.
-
-Implementei o novo filtro no formato `selectbox`, exatamente como o de "Movimentação", e posicionei-o na barra lateral, logo abaixo do filtro de "Classificação DRE".
-
-### **Código `app.py` Atualizado com o Novo Filtro**
-
-**Instruções:**
-Pode substituir todo o conteúdo do seu arquivo `app.py` pelo código completo abaixo. As alterações estão documentadas com comentários na secção da barra lateral para que possa ver exatamente o que foi adicionado.
-
-```python
 # app.py - Versão com filtro de Tipo de Operação
 
 import streamlit as st
@@ -401,5 +391,3 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
-
-```
