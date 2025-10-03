@@ -220,32 +220,46 @@ if not df.empty:
     
     tabs = st.tabs(tab_list)
 
-    with tabs[0]: # Dashboard Geral
-        tipo_analise = st.radio("Selecione a visão do Dashboard:", ["Vendas", "Compras"], horizontal=True)
-        if tipo_analise == "Vendas":
-            df_vendas = df_operacional[df_operacional['Movimentação'] == 'Saída']
-            st.subheader("Resumo de Vendas")
-            total_vendas = df_vendas['Total do Item'].sum()
-            total_custo_vendas = (df_vendas['Custo Total']).sum()
-            lucro_bruto = total_vendas - total_custo_vendas
+    with tabs[0]:
+        st.header("Dashboard Mensal de Vendas")
+
+        # Filtra apenas os dados de vendas (Saída) do período selecionado
+        df_vendas = df_operacional[df_operacional['Movimentação'] == 'Saída']
+
+        if not df_vendas.empty:
+            # --- 1. CÁLCULO DOS KPIs ---
+            valor_total_vendido = df_vendas['Total do Item'].sum()
+            quantidade_pedidos = df_vendas['Nota'].nunique()
+            ticket_medio = valor_total_vendido / quantidade_pedidos if quantidade_pedidos > 0 else 0
+
+            # --- 2. EXIBIÇÃO DOS KPIs ---
             col1, col2, col3 = st.columns(3)
-            col1.metric("Vendas Totais", formatar_numero_br(total_vendas))
-            col2.metric("Custo das Vendas", formatar_numero_br(total_custo_vendas))
-            col3.metric("Lucro Bruto", formatar_numero_br(lucro_bruto))
-            st.subheader("Vendas por Cliente")
-            vendas_por_cliente = df_vendas.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False)
-            st.bar_chart(vendas_por_cliente)
-        elif tipo_analise == "Compras":
-            df_compras = df_operacional[df_operacional['Movimentação'] == 'Entrada']
-            st.subheader("Resumo de Compras")
-            total_compras = df_compras['Total do Item'].sum()
-            num_notas_compra = df_compras['Nota'].nunique()
-            col1, col2 = st.columns(2)
-            col1.metric("Total de Compras", formatar_numero_br(total_compras))
-            col2.metric("Notas de Compra", f"{num_notas_compra}")
-            st.subheader("Maiores Compras (por Fornecedor/Cliente)")
-            compras_por_fornecedor = df_compras.groupby('Cliente')['Total do Item'].sum().sort_values(ascending=False).nlargest(15)
-            st.bar_chart(compras_por_fornecedor)
+            col1.metric("Valor Total Vendido", formatar_numero_br(valor_total_vendido))
+            col2.metric("Quantidade de Pedidos", f"{quantidade_pedidos}")
+            col3.metric("Ticket Médio", formatar_numero_br(ticket_medio))
+
+            st.divider()
+
+            # --- 3. LAYOUT PARA GRÁFICOS ---
+            col_graf1, col_graf2 = st.columns([2, 1]) # Coluna do gráfico maior que a do ranking
+
+            with col_graf1:
+                st.subheader("Valor total de pedidos por dia")
+                vendas_por_dia = df_vendas.groupby(df_vendas['Data Emissão'].dt.date)['Total do Item'].sum()
+                st.line_chart(vendas_por_dia)
+
+            with col_graf2:
+                st.subheader("Top 10 Clientes")
+                ranking_clientes = df_vendas.groupby('Cliente')['Total do Item'].sum().nlargest(10).reset_index()
+                st.dataframe(ranking_clientes,
+                             column_config={
+                                 "Cliente": "Cliente",
+                                 "Total do Item": st.column_config.NumberColumn("Valor Comprado", format="R$ %.2f")
+                             },
+                             hide_index=True,
+                             use_container_width=True)
+        else:
+            st.warning("Nenhuma venda encontrada para os filtros selecionados.")
     
     if 'Classificação DRE' in df_operacional.columns:
         with tabs[1]: # DRE Simplificado
@@ -394,3 +408,4 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
+
