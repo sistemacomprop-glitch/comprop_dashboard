@@ -1,13 +1,3 @@
-Com certeza\! Ótima sugestão. Separar os valores de entrada e saída na aba de transferências vai dar uma visão muito mais clara do fluxo de stock entre as suas unidades.
-
-Fiz exatamente a alteração que pediu: agora, em vez de um valor total, a aba "Transferências" exibe três métricas principais: o total de operações, o valor total de entradas por transferência e o valor total de saídas por transferência, e removi a palavra "(Custo)" dos títulos.
-
-### **Código `app.py` Atualizado**
-
-**Instruções:**
-Substitua o conteúdo do seu arquivo `app.py` pelo código completo abaixo. A única alteração está na aba "Transferências".
-
-```python
 # app.py - Versão com métricas de transferência separadas
 
 import streamlit as st
@@ -396,4 +386,3 @@ else:
         st.info("Aguardando dados da nuvem... A planilha online pode estar vazia ou indisponível.")
     else:
         st.info(f"Arquivo '{CAMINHO_EXCEL_LOCAL}' não encontrado. Execute o 'main.py' primeiro para gerar os dados.")
-```
