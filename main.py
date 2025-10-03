@@ -4,6 +4,7 @@ import os
 import glob
 from datetime import date, timedelta
 import pandas as pd
+import sys
 
 # Importa as configurações e as funções de cada módulo especializado
 from config import *
@@ -65,7 +66,14 @@ if __name__ == "__main__":
         # --- LÓGICA DO MODO ONLINE (INCREMENTAL) ---
         print("Executando em MODO ONLINE...")
         try:
-            df_existentes, _ = buscar_dados_existentes(NOME_PLANILHA_ONLINE, CAMINHO_CREDENCIAS_JSON)
+            try:
+                df_existentes, _ = buscar_dados_existentes(NOME_PLANILHA_ONLINE, CAMINHO_CREDENCIAS_JSON)
+            except RuntimeError as e:
+                print(f"\n--- INTERRUPÇÃO DE SEGURANÇA ---")
+                print(str(e))
+                sys.exit(1) # Interrompe o programa com um código de erro.
+
+            # O resto do seu código continua dentro do bloco 'try' principal
             hoje = date.today()
             if not df_existentes.empty and not df_existentes['Data Emissão'].dropna().empty:
                 ultima_data = df_existentes['Data Emissão'].dropna().max().date()
@@ -77,15 +85,16 @@ if __name__ == "__main__":
             data_inicial_rpa_str = data_inicio_extracao.strftime('%d%m%y')
             data_final_rpa_str = data_fim_extracao.strftime('%d%m%y')
 
-           # sucesso_rpa = executar_rpa_extracao(PASTA_RAIZ_RELATORIOS, data_inicial_rpa_str, data_final_rpa_str)
-           # if not sucesso_rpa:
-           #     raise RuntimeError("A automação (RPA) falhou.")
+            sucesso_rpa = executar_rpa_extracao(PASTA_RAIZ_RELATORIOS, data_inicial_rpa_str, data_final_rpa_str)
+            if not sucesso_rpa:
+                raise RuntimeError("A automação (RPA) falhou.")
 
             novos_dados_df, df_inventario_novo = executar_processo_de_dados(PASTA_RAIZ_RELATORIOS, PALAVRA_CHAVE_INVENTARIO)
             if novos_dados_df is not None and not novos_dados_df.empty:
                 atualizar_dados_no_google_sheets(novos_dados_df, df_existentes, df_inventario_novo, NOME_PLANILHA_ONLINE, CAMINHO_CREDENCIAS_JSON)
             else:
                 print("Nenhum dado novo foi encontrado para adicionar à planilha.")
+
         except Exception as e:
             print(f"\n--- ERRO NA EXECUÇÃO ONLINE ---")
             print(e)

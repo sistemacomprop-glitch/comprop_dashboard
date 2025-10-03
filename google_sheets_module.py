@@ -4,17 +4,21 @@
 import pandas as pd
 import gspread
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
+from gspread.exceptions import APIError # <-- 1. IMPORTE A EXCEÇÃO APIError
 
 def buscar_dados_existentes(nome_planilha, credenciais_json):
     """
-    Conecta e busca dados das abas 'Movimentacoes' e 'Estoque',
-    retornando sempre dois DataFrames.
+    Conecta e busca dados das abas 'Movimentacoes' e 'Estoque'.
+    Se ocorrer um erro de API (como erro 500), levanta uma exceção para parar o script.
     """
     try:
         print("--- LENDO PLANILHA EXISTENTE ---")
         gc = gspread.service_account(filename=credenciais_json)
         spreadsheet = gc.open(nome_planilha)
         
+        df_mov = pd.DataFrame()
+        df_est = pd.DataFrame()
+
         try:
             mov_sheet = spreadsheet.worksheet('Movimentacoes')
             df_mov = get_as_dataframe(mov_sheet, evaluate_formulas=True)
@@ -23,7 +27,6 @@ def buscar_dados_existentes(nome_planilha, credenciais_json):
                 df_mov['Data Emissão'] = pd.to_datetime(df_mov['Data Emissão'], format='%d/%m/%Y', errors='coerce')
         except gspread.exceptions.WorksheetNotFound:
             print("  > Aba 'Movimentacoes' não encontrada. Assumindo como vazia.")
-            df_mov = pd.DataFrame()
 
         try:
             est_sheet = spreadsheet.worksheet('Estoque')
@@ -31,16 +34,22 @@ def buscar_dados_existentes(nome_planilha, credenciais_json):
             df_est.dropna(how='all', inplace=True)
         except gspread.exceptions.WorksheetNotFound:
             print("  > Aba 'Estoque' não encontrada. Assumindo como vazia.")
-            df_est = pd.DataFrame()
 
-        print(f"  > Encontrados {len(df_mov)} registros de movimentação e {len(df_est)} de estoque.")
+        print(f"  > Leitura concluída: {len(df_mov)} registros de movimentação e {len(df_est)} de estoque encontrados.")
         return df_mov, df_est
 
+    except APIError as e:
+        # --- 2. CAPTURA O ERRO 500 E LEVANTA UMA NOVA EXCEÇÃO ---
+        print(f"  > ERRO CRÍTICO DE API: Ocorreu um erro ao comunicar com o Google Sheets (ex: Erro 500).")
+        print(f"  > Detalhes: {e}")
+        # Levanta uma nova exceção para que o main.py saiba que deve parar.
+        raise RuntimeError("Falha na leitura dos dados existentes. O processo será interrompido para proteger os dados.")
+        
     except gspread.exceptions.SpreadsheetNotFound:
         print(f"  > AVISO: A planilha '{nome_planilha}' não foi encontrada. Assumindo dados vazios.")
         return pd.DataFrame(), pd.DataFrame()
     except Exception as e:
-        print(f"  > ERRO ao buscar dados existentes: {e}.")
+        print(f"  > ERRO inesperado ao buscar dados existentes: {e}.")
         return pd.DataFrame(), pd.DataFrame()
 
 def atualizar_dados_no_google_sheets(df_mov_novos, df_mov_existentes, df_est_novo, nome_planilha, credenciais_json):
