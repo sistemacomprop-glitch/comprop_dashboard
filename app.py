@@ -1,4 +1,4 @@
-# app.py - Versão com filtro de Tipo de Operação
+# app.py - Versão com correção na formatação da tabela detalhada
 
 import streamlit as st
 import pandas as pd
@@ -145,13 +145,11 @@ if not df.empty:
     else:
         dre_selecionado = 'Todas'
 
-    # --- INÍCIO DA MUDANÇA: Adição do novo filtro ---
     if 'Tipo de Operação' in df.columns:
         tipo_operacao_unicas = ['Todas'] + sorted(df['Tipo de Operação'].astype(str).unique())
         tipo_operacao_selecionada = st.sidebar.selectbox("Filtrar por Tipo de Operação", tipo_operacao_unicas)
     else:
         tipo_operacao_selecionada = 'Todas'
-    # --- FIM DA MUDANÇA ---
 
     item_pesquisado = st.sidebar.text_input("Pesquisar por nome do Item")
     nf_pesquisada = st.sidebar.text_input("Pesquisar por Nº da Nota")
@@ -165,10 +163,8 @@ if not df.empty:
     if dre_selecionado != 'Todas' and 'Classificação DRE' in df_filtrado.columns:
         df_filtrado = df_filtrado[df_filtrado['Classificação DRE'] == dre_selecionado]
     
-    # --- INÍCIO DA MUDANÇA: Lógica de aplicação do novo filtro ---
     if tipo_operacao_selecionada != 'Todas' and 'Tipo de Operação' in df_filtrado.columns:
         df_filtrado = df_filtrado[df_filtrado['Tipo de Operação'] == tipo_operacao_selecionada]
-    # --- FIM DA MUDANÇA ---
         
     if item_pesquisado:
         df_filtrado = df_filtrado[df_filtrado['Item Descrição'].str.contains(item_pesquisado, case=False, na=False)]
@@ -322,7 +318,11 @@ if not df.empty:
         movimentacao_diaria = df_operacional.groupby([df_operacional['Data Emissão'].dt.date, 'Movimentação'])['Total do Item'].sum().unstack(fill_value=0)
         st.bar_chart(movimentacao_diaria)
         st.dataframe(movimentacao_diaria,
-            column_config={"Entrada": "R$ %.2f", "Saída": "R$ %.2f", "Sem Movimentação": "R$ %.2f"}
+            column_config={
+                "Entrada": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Saída": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Sem Movimentação": st.column_config.NumberColumn(format="R$ %.2f")
+            }
         )
 
     with tabs[4]: # Ranking de Produtos
@@ -332,7 +332,7 @@ if not df.empty:
             Valor_Total_Vendido=('Total do Item', 'sum')
         ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
         st.dataframe(ranking_produtos, width='stretch',
-            column_config={"Valor_Total_Vendido": "R$ %.2f"}
+            column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
         )
 
     with tabs[5]: # Ranking Vendedores
@@ -344,26 +344,29 @@ if not df.empty:
                 Quantidade_de_Vendas=('Nota', 'nunique')
             ).sort_values(by='Valor_Total_Vendido', ascending=False).reset_index()
             st.dataframe(ranking_vendedores, width='stretch',
-                column_config={"Valor_Total_Vendido": "R$ %.2f"}
+                column_config={"Valor_Total_Vendido": st.column_config.NumberColumn("Valor Total Vendido", format="R$ %.2f")}
             )
         else:
             st.info("Não há dados de vendas por representante para o período selecionado.")
 
     with tabs[6]: # Consulta Detalhada
         st.header("Consulta Detalhada das Movimentações (Operacional)")
+        
+        # --- INÍCIO DA CORREÇÃO ---
         st.dataframe(df_operacional, width='stretch',
             column_config={
-                "Data Emissão": st.column_config.DateColumn(format="DD/MM/YYYY"),
-                "Data de Vencimento": st.column_config.DateColumn(format="DD/MM/YYYY"),
-                "Valor Unitário": "R$ %.2f",
-                "Total do Item": "R$ %.2f",
-                "Preço de Venda": "R$ %.2f",
-                "Preço de Custo": "R$ %.2f",
-                "Custo Total": "R$ %.2f",
-                "Total da Nota": "R$ %.2f",
+                "Data Emissão": st.column_config.DateColumn("Data de Emissão", format="DD/MM/YYYY"),
+                "Data de Vencimento": st.column_config.DateColumn("Data de Vencimento", format="DD/MM/YYYY"),
+                "Valor Unitário": st.column_config.NumberColumn("Valor Unitário", format="R$ %.2f"),
+                "Total do Item": st.column_config.NumberColumn("Total do Item", format="R$ %.2f"),
+                "Preço de Venda": st.column_config.NumberColumn("Preço de Venda", format="R$ %.2f"),
+                "Preço de Custo": st.column_config.NumberColumn("Preço de Custo", format="R$ %.2f"),
+                "Custo Total": st.column_config.NumberColumn("Custo Total", format="R$ %.2f"),
+                "Total da Nota": st.column_config.NumberColumn("Total da Nota", format="R$ %.2f"),
             }
         )
-    
+        # --- FIM DA CORREÇÃO ---
+
     with tabs[7]: # Estoque Atual
         st.header("Consulta de Estoque de Inventário")
         if not df_estoque.empty:
